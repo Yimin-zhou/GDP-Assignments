@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Vector;
 
+import Jama.Matrix;
+import Jama.SingularValueDecomposition;
 import jv.geom.PgElementSet;
 import jv.object.PsConfig;
 import jv.object.PsDialog;
@@ -43,7 +45,7 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 	protected Button m_bStartICP;
 	// task 2.1 step 1
 	private static final int NUM_ICP_POINTS = 50;
-    private Random random = new Random();
+	private Random random = new Random();
 
 
 	/** Constructor */
@@ -61,14 +63,14 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 	public String getNotice() {
 		return "This text should explain what the workshop is about and how to use it.";
 	}
-	
+
 	/** Assign a parent object. */
 	public void setParent(PsUpdateIf parent) {
 		super.setParent(parent);
 		m_registration = (Registration)parent;
-		
+
 		addSubTitle("Select Surfaces to be Registered");
-		
+
 		Panel pGeometries = new Panel();
 		pGeometries.setLayout(new GridLayout(1, 2));
 
@@ -87,7 +89,7 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		Passive.add(m_listPassive, BorderLayout.CENTER);
 		pGeometries.add(Passive);
 		add(pGeometries);
-		
+
 		Panel pSetSurfaces = new Panel(new BorderLayout());
 		m_bSetSurfaces = new Button("Set selected surfaces");
 		m_bSetSurfaces.addActionListener(this);
@@ -96,20 +98,20 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 		// task 2
 		m_bStartICP = new Button("Start ICP");
-        m_bStartICP.addActionListener(this);
-        Panel pStartICP = new Panel(new BorderLayout());
-        pStartICP.add(m_bStartICP, BorderLayout.CENTER);
-        add(pStartICP);
-		
+		m_bStartICP.addActionListener(this);
+		Panel pStartICP = new Panel(new BorderLayout());
+		pStartICP.add(m_bStartICP, BorderLayout.CENTER);
+		add(pStartICP);
+
 		updateGeomList();
 		validate();
 	}
-		
+
 	/** Initialisation */
 	public void init() {
 		super.init();
 		setTitle("Surface Registration");
-		
+
 	}
 
 	/** Set the list of geometries in the lists to the current state of the display. */
@@ -145,13 +147,13 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		Object source = event.getSource();
 		if (source == m_bSetSurfaces) {
 			m_registration.setGeometries((PgElementSet)m_geomList.elementAt(m_listActive.getSelectedIndex()),
-			(PgElementSet)m_geomList.elementAt(m_listPassive.getSelectedIndex()));
+					(PgElementSet)m_geomList.elementAt(m_listPassive.getSelectedIndex()));
 			return;
 		}
 		else if (source == m_bStartICP) {
-            performICP();
-            return;
-        }
+			performICP();
+			return;
+		}
 	}
 
 	// task 2
@@ -213,7 +215,7 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		}
 		centroidP.multScalar(1.0 / pVertices.size());
 		centroidQ.multScalar(1.0 / qVertices.size());
-	
+
 		// Build matrix H
 		PdMatrix M = new PdMatrix(3, 3);
 		for (int i = 0; i < pVertices.size(); i++) {
@@ -222,28 +224,30 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 			PdMatrix pqT = outerProductNew(pCentroid, qCentroid);
 			M.add(pqT);
 		}
-	
+
 		// Compute SVD of H
-		PdMatrix U = new PdMatrix();
-		PdMatrix V = new PdMatrix();
-		PdVector s = new PdVector();
+		Matrix jamaM = new Matrix(M.getEntries());
+		SingularValueDecomposition SVD = jamaM.svd();
+		PdMatrix U = new PdMatrix(SVD.getU().getArray());
+		PdMatrix V = new PdMatrix(SVD.getV().getArray());
+		PdMatrix s = new PdMatrix(SVD.getS().getArray());
 		// M.svd(U, s, V); // TODO calculate SVD
-	
+
 		// Compute rotation matrix R
 		PdMatrix R = new PdMatrix(3, 3);
 		R.leftMult(U);
 		R.rightMult(V);
-	
+
 		if (R.det() < 0) {
 			PdMatrix diag = new PdMatrix(new double[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, -1}});
 			U.leftMult(diag);
 			R = U;
 			R.rightMult(V);
 		}
-	
+
 		// Compute translation vector t
 		PdVector t = PdVector.subNew(centroidQ, R.leftMultMatrix(centroidP, centroidP)); // TODO calculate t
-	
+
 		// Apply the optimal rigid transformation to P
 		for (PdVector vertex : pVertices) {
 			vertex.leftMultMatrix(R);
@@ -257,29 +261,29 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 
 	private int[] selectRandomVertices(PgElementSet mesh, int numVertices) {
-        int[] indices = new int[numVertices];
-        for (int i = 0; i < numVertices; i++) {
-            indices[i] = random.nextInt(mesh.getNumVertices());
-        }
-        return indices;
-    }
+		int[] indices = new int[numVertices];
+		for (int i = 0; i < numVertices; i++) {
+			indices[i] = random.nextInt(mesh.getNumVertices());
+		}
+		return indices;
+	}
 
-    private PdVector findClosestVertex(PdVector point, PgElementSet mesh) {
-        PdVector closest = null;
-        double closestDistance = Double.MAX_VALUE;
+	private PdVector findClosestVertex(PdVector point, PgElementSet mesh) {
+		PdVector closest = null;
+		double closestDistance = Double.MAX_VALUE;
 
 		// brute force search
-        for (int i = 0; i < mesh.getNumVertices(); i++) {
-            PdVector vertex = mesh.getVertex(i);
-            double distance = point.dist(vertex);
-            if (distance < closestDistance) {
-                closest = vertex;
-                closestDistance = distance;
-            }
-        }
+		for (int i = 0; i < mesh.getNumVertices(); i++) {
+			PdVector vertex = mesh.getVertex(i);
+			double distance = point.dist(vertex);
+			if (distance < closestDistance) {
+				closest = vertex;
+				closestDistance = distance;
+			}
+		}
 
-        return closest;
-    }
+		return closest;
+	}
 	public static PdMatrix outerProductNew(PdVector a, PdVector b) {
 		PdMatrix result = new PdMatrix(3, 3);
 		for (int i = 0; i < 3; i++) {
@@ -288,7 +292,7 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 			}
 		}
 		return result;
-	}	
+	}
 
 	/**
 	 * Get information which bottom buttons a dialog should create
