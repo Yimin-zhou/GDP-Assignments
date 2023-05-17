@@ -277,9 +277,9 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 			SingularValueDecomposition SVD = jamaM.svd();
 
 			// Compute optimal rotation matrix R
-			// Compute the determinant of UV^T
-			Matrix UVt = SVD.getV().times(SVD.getU().transpose());
-			double det = UVt.det();
+			// Compute the determinant of VU^T
+			Matrix VUt = SVD.getV().times(SVD.getU().transpose());
+			double det = VUt.det();
 
 			// Create a 3x3 matrix for correcting the rotation matrix
 			Matrix correction = Matrix.identity(3, 3);
