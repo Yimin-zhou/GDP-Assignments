@@ -44,6 +44,8 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 	protected 	PuInteger		m_icp_iteration;
 
+	protected TextField mean_squared_error;
+
 	protected Checkbox m_cbUsePointToPlane;
 
 
@@ -67,7 +69,8 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 	 * The text is split at line breaks into individual lines on the dialog.
 	 */
 	public String getNotice() {
-		return "This text should explain what the workshop is about and how to use it.";
+		return "This tool allows for rigid transformations using the ICP algorithm. Please drag down the UI to see all the controls. Please first fill in" +
+				" the parameters and select the respective meshes you want to use.";
 	}
 
 	/** Assign a parent object. */
@@ -79,7 +82,6 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 		Panel pGeometries = new Panel();
 		pGeometries.setLayout(new GridLayout(1, 2));
-
 		Panel Passive = new Panel();
 		Passive.setLayout(new BorderLayout());
 		Panel Active = new Panel();
@@ -105,18 +107,21 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		// task 2
 		m_threshold = new PuDouble("Threshold");
 		m_threshold.setDefBounds(-50,50,0.1,1);
+		m_threshold.setDefValue(k);
 		m_threshold.addUpdateListener(this);
 		m_threshold.init();
 		add(m_threshold.getInfoPanel());
 
 		m_icp_points = new PuInteger("ICP Points");
 		m_icp_points.setDefBounds(1,100,1,1);
+		m_icp_points.setDefValue(icp_points);
 		m_icp_points.addUpdateListener(this);
 		m_icp_points.init();
 		add(m_icp_points.getInfoPanel());
 
 		m_icp_iteration = new PuInteger("ICP Iteration");
 		m_icp_iteration.setDefBounds(1,50,1,1);
+		m_icp_iteration.setDefValue(icp_iteration);
 		m_icp_iteration.addUpdateListener(this);
 		m_icp_iteration.init();
 		add(m_icp_iteration.getInfoPanel());
@@ -129,6 +134,12 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		Panel pStartICP = new Panel(new BorderLayout());
 		pStartICP.add(m_bStartICP, BorderLayout.CENTER);
 		add(pStartICP);
+
+		mean_squared_error = new TextField("MSE: ", 20);
+		mean_squared_error.setEditable(false);
+		Panel panel = new Panel(new FlowLayout(FlowLayout.CENTER));
+		panel.add(mean_squared_error);
+		add(panel);
 
 		updateGeomList();
 		validate();
@@ -235,9 +246,6 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 			double threshold = k * medianDistance;
 
-			System.out.println("k: " + k);
-			System.out.println("median distance: " + medianDistance);
-
 			ArrayList<PdVector> newPVertices = new ArrayList<>();
 			ArrayList<PdVector> newQVertices = new ArrayList<>();
 
@@ -307,6 +315,21 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 			// update the display
 			p.update(p);
+
+			// calculate MSE
+			float mean = 0;
+			for (int i = 0; i < pVertices.size(); i++) {
+				// This is after applying the rotation and translation
+				PdVector pi = pVertices.get(i);
+				PdVector qi = qVertices.get(i);
+				PdVector result = new PdVector(i);
+				R.leftMultMatrix(result, pi);
+				result.add(t);
+				mean += PdVector.sqrDist(result, qi);
+			}
+			mean = mean / (2.0f * p.getNumVertices());
+			mean_squared_error.setText("MSE: " + mean);
+
 		}
 	}
 

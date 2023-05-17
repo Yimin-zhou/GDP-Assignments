@@ -51,31 +51,31 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	
 	public void init() {
 		super.init();
-		setTitle("My Workshop");
+		setTitle("Mesh and Surface Analysis");
 	}
 	
 	public String getNotice() {
-		return "This text should explain what the workshop is about and how to use it.";
+		return "This workshop can be used to calculate perform mesh and surface analysis to retrieve properties such as genus, volume and amount of components.";
 	}
 	
 	public void setParent(PsUpdateIf parent) {
 		super.setParent(parent);
 		m_ws = (MyWorkshop)parent;
 	
-		addSubTitle("My subtitle");
-		
-		m_bMakeRandomElementColors = new Button("Random Element Colors");
-		m_bMakeRandomElementColors.addActionListener(this);
-		m_bMakeRandomVertexColors = new Button("Random Vertex Colors");
-		m_bMakeRandomVertexColors.addActionListener(this);
+		addSubTitle("Properties");
+
+//		m_bMakeRandomElementColors = new Button("Random Element Colors");
+//		m_bMakeRandomElementColors.addActionListener(this);
+//		m_bMakeRandomVertexColors = new Button("Random Vertex Colors");
+//		m_bMakeRandomVertexColors.addActionListener(this);
 		m_textField = addTextField("Number of Triangles:", 20);
 		m_textField.setEditable(false);
 		m_textField.setText(String.valueOf(m_ws.m_geom.getNumElements()));
-		Panel panel1 = new Panel(new FlowLayout(FlowLayout.CENTER));
-		panel1.add(m_bMakeRandomElementColors);
-		panel1.add(m_bMakeRandomVertexColors);
-		add(panel1);
-		
+//		Panel panel1 = new Panel(new FlowLayout(FlowLayout.CENTER));
+//		panel1.add(m_bMakeRandomElementColors);
+//		panel1.add(m_bMakeRandomVertexColors);
+//		add(panel1);
+
 		m_xOff = new PuDouble("X Offset");
 		m_xOff.setDefBounds(-10,10,0.1,1);
 		m_xOff.addUpdateListener(this);
