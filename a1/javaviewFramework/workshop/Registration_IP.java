@@ -49,10 +49,10 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 	protected Button m_bStartICP;
 	// task 2.1 step 1
-	private int icp_points = 50;
+	private int icp_points = 20;
 	private Random random = new Random();
 	private 	double 		k = 1.5;
-	private int icp_iteration = 10;
+	private int icp_iteration = 1;
 
 	/** Constructor */
 	public Registration_IP () {
@@ -287,15 +287,20 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 			Matrix R_jama = SVD.getV().times(correction).times(SVD.getU().transpose());
 			// convert Jama matrix to PdMatrix
 			PdMatrix R = new PdMatrix(R_jama.getArray());
+			PdMatrix R_temp = R;
 
 			// compute translation vector t
 			PdVector t = new PdVector(3);
-			t = PdVector.subNew(centroidQ, R.leftMultMatrix(t, centroidP));
+			PdVector temp = new PdVector(3);
+			R_temp.leftMultMatrix(temp, centroidP);
+			t = PdVector.subNew(centroidQ, temp);
 
 			// Apply the optimal rigid transformation to P
 			for (int i = 0; i < p.getNumVertices(); i++) {
 				PdVector pi = p.getVertex(i);
-				PdVector qi = R.leftMultMatrix(pi, pi);
+				PdVector temp_2 = new PdVector(3);
+				R.leftMultMatrix(temp_2, pi);
+				PdVector qi = temp_2;
 				qi.add(t);
 				p.setVertex(i, qi);
 			}
