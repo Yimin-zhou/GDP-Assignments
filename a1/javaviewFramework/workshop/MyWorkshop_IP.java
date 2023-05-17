@@ -188,12 +188,12 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
         for (int i = 0; i < m_ws.m_geom.getNumElements(); i++) {
 			PiVector element = m_ws.m_geom.getElement(i);
             PdVector v0 = m_ws.m_geom.getVertex(element.getEntry(0));
-            PdVector v1 = m_ws.m_geom.getVertex(element.getEntry(1));
-            PdVector v2 = m_ws.m_geom.getVertex(element.getEntry(2));
+            PdVector v1 = m_ws.m_geom.getVertex(element.getEntry(2));
+            PdVector v2 = m_ws.m_geom.getVertex(element.getEntry(1));
 
 			PdVector crossProduct = new PdVector();
 			crossProduct = crossProduct.crossNew(v1, v2);
-			volume += v0.dot(crossProduct) / 6.0;
+			volume += Math.abs(v0.dot(crossProduct) / 6.0);
         }
 
         // Display the result
