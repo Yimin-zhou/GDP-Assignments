@@ -1,12 +1,6 @@
 package workshop;
 
-import java.awt.BorderLayout;
-import java.awt.Button;
-import java.awt.Dimension;
-import java.awt.GridLayout;
-import java.awt.Label;
-import java.awt.List;
-import java.awt.Panel;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
@@ -50,13 +44,15 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 	protected 	PuInteger		m_icp_iteration;
 
+	protected Checkbox m_cbUsePointToPlane;
+
+
 	protected Button m_bStartICP;
 	// task 2.1 step 1
 	private int icp_points = 50;
 	private Random random = new Random();
 	private 	double 		k = 1.5;
 	private int icp_iteration = 10;
-
 
 	/** Constructor */
 	public Registration_IP () {
@@ -124,6 +120,9 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		m_icp_iteration.addUpdateListener(this);
 		m_icp_iteration.init();
 		add(m_icp_iteration.getInfoPanel());
+
+		m_cbUsePointToPlane = new Checkbox("Use Point-to-Plane");
+		add(m_cbUsePointToPlane);
 
 		m_bStartICP = new Button("Start ICP");
 		m_bStartICP.addActionListener(this);
@@ -212,7 +211,13 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 			for (int i : selectedIndices) {
 				PdVector pi = p.getVertex(i);
-				PdVector qi = findClosestVertex(pi, q);
+				PdVector qi;
+
+				if (m_cbUsePointToPlane.getState()) {
+					qi = findClosestPlane(pi, q);;
+				} else {
+					qi = findClosestVertex(pi, q);
+				}
 
 				// Store vertices and distance
 				pVertices.add(pi);
@@ -324,6 +329,35 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 
 		return closest;
 	}
+
+
+	private PdVector findClosestPlane(PdVector point, PgElementSet mesh) {
+		PdVector closest = null;
+		double closestDistance = Double.MAX_VALUE;
+
+		for (int i = 0; i < mesh.getNumElements(); i++) {
+			// get vertices of the element
+			PdVector[] vertices = new PdVector[3];
+			for (int j = 0; j < 3; j++) {
+				vertices[j] = mesh.getElementVertices(i)[j];
+			}
+			PdVector normal = PdVector.crossNew(PdVector.subNew(vertices[1], vertices[0]), PdVector.subNew(vertices[2], vertices[0]));
+			normal.normalize();
+
+			// Compute the distance from the point to the plane
+			double distance = Math.abs(PdVector.subNew(point, vertices[0]).dot(normal));
+
+			if (distance < closestDistance) {
+				// If this plane is closer, project the point onto the plane to get the "closest" point
+				normal.multScalar(distance);
+				closest = PdVector.subNew(point, normal);
+				closestDistance = distance;
+			}
+		}
+
+		return closest;
+	}
+
 	public static PdMatrix outerProductNew(PdVector a, PdVector b) {
 		PdMatrix result = new PdMatrix(3, 3);
 		for (int i = 0; i < 3; i++) {
