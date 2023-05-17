@@ -8,8 +8,10 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import java.util.Stack;
+import java.util.*;
 
+import jv.geom.PgBndPolygon;
+import jv.geom.PgEdgeStar;
 import jv.number.PuDouble;
 import jv.object.PsConfig;
 import jv.object.PsDialog;
@@ -160,13 +162,28 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		int V = m_ws.m_geom.getNumVertices();
 		int E = m_ws.m_geom.getNumEdges();
 		int F = m_ws.m_geom.getNumElements();
-		int genus = (2 - (V - E + F)) / 2;
+		int genus = 0;
+
+		// assume no boundary loops
+		genus = (int) (1.0f - (float)((V - E + F) / 2.0f));
+		if (genus < 0) {
+			genus = 0;
+		}
 		m_genusResult.setText("Genus: " + genus);
+
+		// print v e f
+		// System.out.println("V: " + V + " E: " + E + " F: " + F);
 	}
 
 	// task 1.2 calculate closed volume
     private void calculateVolume() {
         double volume = 0.0;
+
+		// if the mesh is not closed, return
+		if (m_ws.m_geom.getNumBoundaryEdges() > 0) {
+			m_volumeResult.setText("Volume: " + "The mesh is not closed");
+			return;
+		}
 
         for (int i = 0; i < m_ws.m_geom.getNumElements(); i++) {
 			PiVector element = m_ws.m_geom.getElement(i);
@@ -190,41 +207,37 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
     }
 
 	private int getNumberOfConnectedComponents(PgElementSet geom) {
-		int numVertices = geom.getNumVertices();
-		boolean[] visited = new boolean[numVertices];
-		int numComponents = 0;
-	
-		for (int v = 0; v < numVertices; v++) {
-			if (!visited[v]) {
-				DFS(geom, v, visited);
-				numComponents++;
-			}
-		}
-	
-		return numComponents;
-	}	
+		int num_components = 0;
+		LinkedList<Integer> queue = new LinkedList<Integer>();
+		int element_count = m_ws.m_geom.getNumElements();
+		boolean[] visited = new boolean[element_count];
 
-	private void DFS(PgElementSet geom, int v, boolean[] visited) {
-		Stack<Integer> stack = new Stack<>();
-		stack.push(v);
-	
-		PiVector[] neighbours = geom.getNeighbours();
-	
-		while (!stack.isEmpty()) {
-			int current = stack.pop();
-			visited[current] = true;
-	
-			for (int i = 0; i < neighbours[current].getSize(); i++) {
-				int neighbour = neighbours[current].getEntry(i);
-				if (neighbour < 0 || neighbour >= visited.length) {
-					continue;
+		for (int i = 0; i < element_count; i++) {
+			if (!visited[i]) {
+				visited[i] = true;
+				queue.add(i);
+
+				while (queue.size() != 0) {
+					int element = queue.poll();
+					PiVector neighbours = m_ws.m_geom.getNeighbours()[element];
+
+					for (int j = 0; j < neighbours.getSize(); j++) {
+						int entry = neighbours.getEntry(j);
+						if (entry < 0)
+							continue;
+
+						if (!visited[entry]) {
+							visited[entry] = true;
+							queue.add(entry);
+						}
+					}
 				}
-				if (!visited[neighbour]) {
-					stack.push(neighbour);
-				}
+				num_components++;
 			}
 		}
-	}
+
+		return num_components;
+	}	
 
 	/**
 	 * Get information which bottom buttons a dialog should create

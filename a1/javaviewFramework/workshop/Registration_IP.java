@@ -16,6 +16,8 @@ import java.util.Vector;
 import Jama.Matrix;
 import Jama.SingularValueDecomposition;
 import jv.geom.PgElementSet;
+import jv.number.PuDouble;
+import jv.number.PuInteger;
 import jv.object.PsConfig;
 import jv.object.PsDialog;
 import jv.object.PsUpdateIf;
@@ -42,10 +44,18 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 	protected	Registration	m_registration;
 	protected   Button			m_bSetSurfaces;
 
+	protected 	PuDouble 		m_threshold;
+
+	protected 	PuInteger		m_icp_points;
+
+	protected 	PuInteger		m_icp_iteration;
+
 	protected Button m_bStartICP;
 	// task 2.1 step 1
-	private static final int NUM_ICP_POINTS = 50;
+	private int icp_points = 50;
 	private Random random = new Random();
+	private 	double 		k = 1.5;
+	private int icp_iteration = 100;
 
 
 	/** Constructor */
@@ -97,6 +107,24 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		add(pSetSurfaces);
 
 		// task 2
+		m_threshold = new PuDouble("Threshold");
+		m_threshold.setDefBounds(-50,50,0.1,1);
+		m_threshold.addUpdateListener(this);
+		m_threshold.init();
+		add(m_threshold.getInfoPanel());
+
+		m_icp_points = new PuInteger("ICP Points");
+		m_icp_points.setDefBounds(1,100,1,1);
+		m_icp_points.addUpdateListener(this);
+		m_icp_points.init();
+		add(m_icp_points.getInfoPanel());
+
+		m_icp_iteration = new PuInteger("ICP Iteration");
+		m_icp_iteration.setDefBounds(1,10000,1,1);
+		m_icp_iteration.addUpdateListener(this);
+		m_icp_iteration.init();
+		add(m_icp_iteration.getInfoPanel());
+
 		m_bStartICP = new Button("Start ICP");
 		m_bStartICP.addActionListener(this);
 		Panel pStartICP = new Panel(new BorderLayout());
@@ -140,6 +168,20 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 			m_listActive.add(name);
 		}
 	}
+
+	public boolean update(Object event) {
+		if (event == m_threshold) {
+			k = m_threshold.getValue();
+			return true;
+		} else if (event == m_icp_points) {
+			icp_points = m_icp_points.getValue();
+			return true;
+		} else if (event == m_icp_iteration) {
+			icp_iteration = m_icp_iteration.getValue();
+			return true;
+		}else
+			return super.update(event);
+	}
 	/**
 	 * Handle action events fired by buttons etc.
 	 */
@@ -161,104 +203,108 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		PgElementSet p = (PgElementSet) m_geomList.elementAt(m_listActive.getSelectedIndex());
 		PgElementSet q = (PgElementSet) m_geomList.elementAt(m_listPassive.getSelectedIndex());
 
-		int[] selectedIndices = selectRandomVertices(p, NUM_ICP_POINTS);
-		ArrayList<PdVector> pVertices = new ArrayList<>();
-		ArrayList<PdVector> qVertices = new ArrayList<>();
-		ArrayList<Double> distances = new ArrayList<>();
+		for (int z = 0; z < icp_iteration; z++)
+		{
+			int[] selectedIndices = selectRandomVertices(p, icp_points);
+			ArrayList<PdVector> pVertices = new ArrayList<>();
+			ArrayList<PdVector> qVertices = new ArrayList<>();
+			ArrayList<Double> distances = new ArrayList<>();
 
-		for (int i : selectedIndices) {
-			PdVector pi = p.getVertex(i);
-			PdVector qi = findClosestVertex(pi, q);
+			for (int i : selectedIndices) {
+				PdVector pi = p.getVertex(i);
+				PdVector qi = findClosestVertex(pi, q);
 
-			// Store vertices and distance
-			pVertices.add(pi);
-			qVertices.add(qi);
-			distances.add(pi.dist(qi));
-		}
-
-		// Compute the median distance
-		Collections.sort(distances);
-		double medianDistance;
-		if (distances.size() % 2 == 0) {
-			medianDistance = (distances.get(distances.size()/2 - 1) + distances.get(distances.size()/2)) / 2.0;
-		} else {
-			medianDistance = distances.get(distances.size()/2);
-		}
-
-		double k = 1.5;
-		// Determine the threshold for removing pairs
-		double threshold = k * medianDistance;
-
-		// Create new ArrayLists for filtered vertices
-		ArrayList<PdVector> newPVertices = new ArrayList<>();
-		ArrayList<PdVector> newQVertices = new ArrayList<>();
-
-		// Filter pairs with a distance larger than the threshold
-		for (int i = 0; i < distances.size(); i++) {
-			if (distances.get(i) <= threshold) {
-				newPVertices.add(pVertices.get(i));
-				newQVertices.add(qVertices.get(i));
+				// Store vertices and distance
+				pVertices.add(pi);
+				qVertices.add(qi);
+				distances.add(pi.dist(qi));
 			}
+
+			// Compute the median distance
+			Collections.sort(distances);
+			double medianDistance;
+			if (distances.size() % 2 == 0) {
+				medianDistance = (distances.get(distances.size() / 2 - 1) + distances.get(distances.size() / 2)) / 2.0;
+			} else {
+				medianDistance = distances.get(distances.size() / 2);
+			}
+
+			// Determine the threshold for removing pairs
+			double threshold = k * medianDistance;
+
+			// print k and median distance
+			System.out.println("k: " + k);
+			System.out.println("median distance: " + medianDistance);
+
+			// Create new ArrayLists for filtered vertices
+			ArrayList<PdVector> newPVertices = new ArrayList<>();
+			ArrayList<PdVector> newQVertices = new ArrayList<>();
+
+			// Filter pairs with a distance larger than the threshold
+			for (int i = 0; i < distances.size(); i++) {
+				if (distances.get(i) <= threshold) {
+					newPVertices.add(pVertices.get(i));
+					newQVertices.add(qVertices.get(i));
+				}
+			}
+
+			// Replace the original vertex lists with the filtered ones
+			pVertices = newPVertices;
+			qVertices = newQVertices;
+
+			// task 2.3
+			// Compute centroids of P and Q points
+			PdVector centroidP = new PdVector(3);
+			PdVector centroidQ = new PdVector(3);
+			for (int i = 0; i < pVertices.size(); i++) {
+				centroidP.add(pVertices.get(i));
+				centroidQ.add(qVertices.get(i));
+			}
+			centroidP.multScalar(1.0 / pVertices.size());
+			centroidQ.multScalar(1.0 / qVertices.size());
+
+			// Build matrix M
+			PdMatrix M = new PdMatrix(3, 3);
+			for (int i = 0; i < pVertices.size(); i++) {
+				PdVector pCentroid = PdVector.subNew(pVertices.get(i), centroidP);
+				PdVector qCentroid = PdVector.subNew(qVertices.get(i), centroidQ);
+				PdMatrix pqT = outerProductNew(pCentroid, qCentroid);
+				M.add(pqT);
+			}
+
+			// Compute SVD of M
+			Matrix jamaM = new Matrix(M.getEntries());
+			SingularValueDecomposition SVD = jamaM.svd();
+
+			// Compute optimal rotation matrix R
+			// Compute the determinant of UV^T
+			Matrix UVt = SVD.getV().times(SVD.getU().transpose());
+			double det = UVt.det();
+
+			// Create a 3x3 matrix for correcting the rotation matrix
+			Matrix correction = Matrix.identity(3, 3);
+			correction.set(2, 2, det);
+
+			// Compute optimal rotation matrix R
+			Matrix R_jama = SVD.getV().times(correction).times(SVD.getU().transpose());
+
+			// Convert Jama matrix to PdMatrix
+			PdMatrix R = new PdMatrix(R_jama.getArray());
+
+			// Compute translation vector t
+			PdVector t = new PdVector(3);
+			t = PdVector.subNew(centroidQ, R.leftMultMatrix(t, centroidP));
+
+			// Apply the optimal rigid transformation to P
+			for (PdVector vertex : pVertices) {
+				vertex.leftMultMatrix(R);
+				vertex.add(t);
+			}
+
+			// Call this to update the geometry of P
+			p.update(p);
 		}
-
-		// Replace the original vertex lists with the filtered ones
-		pVertices = newPVertices;
-		qVertices = newQVertices;
-
-		// task 2.3
-		// Compute centroids of P and Q points
-		PdVector centroidP = new PdVector(3);
-		PdVector centroidQ = new PdVector(3);
-		for (int i = 0; i < pVertices.size(); i++) {
-			centroidP.add(pVertices.get(i));
-			centroidQ.add(qVertices.get(i));
-		}
-		centroidP.multScalar(1.0 / pVertices.size());
-		centroidQ.multScalar(1.0 / qVertices.size());
-
-		// Build matrix H
-		PdMatrix M = new PdMatrix(3, 3);
-		for (int i = 0; i < pVertices.size(); i++) {
-			PdVector pCentroid = PdVector.subNew(pVertices.get(i), centroidP);
-			PdVector qCentroid = PdVector.subNew(qVertices.get(i), centroidQ);
-			PdMatrix pqT = outerProductNew(pCentroid, qCentroid);
-			M.add(pqT);
-		}
-
-		// Compute SVD of H
-		Matrix jamaM = new Matrix(M.getEntries());
-		SingularValueDecomposition SVD = jamaM.svd();
-		PdMatrix U = new PdMatrix(SVD.getU().getArray());
-		PdMatrix V = new PdMatrix(SVD.getV().getArray());
-		PdMatrix s = new PdMatrix(SVD.getS().getArray());
-		// M.svd(U, s, V); // TODO calculate SVD
-
-		// Compute rotation matrix R
-		PdMatrix R = new PdMatrix(3, 3);
-		R.leftMult(U);
-		R.rightMult(V);
-
-		if (R.det() < 0) {
-			PdMatrix diag = new PdMatrix(new double[][]{{1, 0, 0}, {0, 1, 0}, {0, 0, -1}});
-			U.leftMult(diag);
-			R = U;
-			R.rightMult(V);
-		}
-
-		// Compute translation vector t
-		PdVector t = PdVector.subNew(centroidQ, R.leftMultMatrix(centroidP, centroidP)); // TODO calculate t
-
-		// Apply the optimal rigid transformation to P
-		for (PdVector vertex : pVertices) {
-			vertex.leftMultMatrix(R);
-			vertex.add(t);
-		}
-
-		// Call this to update the geometry of P
-		p.update(p);
 	}
-
-
 
 	private int[] selectRandomVertices(PgElementSet mesh, int numVertices) {
 		int[] indices = new int[numVertices];
