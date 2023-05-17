@@ -55,7 +55,7 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 	private int icp_points = 50;
 	private Random random = new Random();
 	private 	double 		k = 1.5;
-	private int icp_iteration = 100;
+	private int icp_iteration = 10;
 
 
 	/** Constructor */
@@ -120,7 +120,7 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		add(m_icp_points.getInfoPanel());
 
 		m_icp_iteration = new PuInteger("ICP Iteration");
-		m_icp_iteration.setDefBounds(1,10000,1,1);
+		m_icp_iteration.setDefBounds(1,50,1,1);
 		m_icp_iteration.addUpdateListener(this);
 		m_icp_iteration.init();
 		add(m_icp_iteration.getInfoPanel());
@@ -220,7 +220,6 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 				distances.add(pi.dist(qi));
 			}
 
-			// Compute the median distance
 			Collections.sort(distances);
 			double medianDistance;
 			if (distances.size() % 2 == 0) {
@@ -229,18 +228,14 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 				medianDistance = distances.get(distances.size() / 2);
 			}
 
-			// Determine the threshold for removing pairs
 			double threshold = k * medianDistance;
 
-			// print k and median distance
 			System.out.println("k: " + k);
 			System.out.println("median distance: " + medianDistance);
 
-			// Create new ArrayLists for filtered vertices
 			ArrayList<PdVector> newPVertices = new ArrayList<>();
 			ArrayList<PdVector> newQVertices = new ArrayList<>();
 
-			// Filter pairs with a distance larger than the threshold
 			for (int i = 0; i < distances.size(); i++) {
 				if (distances.get(i) <= threshold) {
 					newPVertices.add(pVertices.get(i));
@@ -248,7 +243,6 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 				}
 			}
 
-			// Replace the original vertex lists with the filtered ones
 			pVertices = newPVertices;
 			qVertices = newQVertices;
 
@@ -272,36 +266,36 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 				M.add(pqT);
 			}
 
-			// Compute SVD of M
+			// compute SVD of M
 			Matrix jamaM = new Matrix(M.getEntries());
 			SingularValueDecomposition SVD = jamaM.svd();
 
-			// Compute optimal rotation matrix R
-			// Compute the determinant of VU^T
+			// compute optimal rotation matrix R
+			// compute the determinant of VU^T
 			Matrix VUt = SVD.getV().times(SVD.getU().transpose());
 			double det = VUt.det();
 
-			// Create a 3x3 matrix for correcting the rotation matrix
 			Matrix correction = Matrix.identity(3, 3);
 			correction.set(2, 2, det);
 
-			// Compute optimal rotation matrix R
+			// compute optimal rotation matrix R
 			Matrix R_jama = SVD.getV().times(correction).times(SVD.getU().transpose());
-
-			// Convert Jama matrix to PdMatrix
+			// convert Jama matrix to PdMatrix
 			PdMatrix R = new PdMatrix(R_jama.getArray());
 
-			// Compute translation vector t
+			// compute translation vector t
 			PdVector t = new PdVector(3);
 			t = PdVector.subNew(centroidQ, R.leftMultMatrix(t, centroidP));
 
 			// Apply the optimal rigid transformation to P
-			for (PdVector vertex : pVertices) {
-				vertex.leftMultMatrix(R);
-				vertex.add(t);
+			for (int i = 0; i < p.getNumVertices(); i++) {
+				PdVector pi = p.getVertex(i);
+				PdVector qi = R.leftMultMatrix(pi, pi);
+				qi.add(t);
+				p.setVertex(i, qi);
 			}
 
-			// Call this to update the geometry of P
+			// update the display
 			p.update(p);
 		}
 	}
