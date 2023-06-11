@@ -1,17 +1,17 @@
 package workshop;
 
-import java.awt.BorderLayout;
-import java.awt.Button;
-import java.awt.Dimension;
-import java.awt.GridLayout;
-import java.awt.Label;
-import java.awt.List;
-import java.awt.Panel;
+import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Vector;
 
+import Jama.Matrix;
+import Jama.SingularValueDecomposition;
 import jv.geom.PgElementSet;
+import jv.number.PuDouble;
+import jv.number.PuInteger;
 import jv.object.PsConfig;
 import jv.object.PsDialog;
 import jv.object.PsUpdateIf;
@@ -20,6 +20,11 @@ import jv.project.PgGeometryIf;
 import jv.project.PvGeometryIf;
 import jv.viewer.PvDisplay;
 import jvx.project.PjWorkshop_IP;
+
+import jv.vecmath.PdVector;
+import jv.vecmath.PdMatrix;
+import java.util.Random;
+
 
 
 /**
@@ -32,6 +37,24 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 	protected	Vector			m_geomList;
 	protected	Registration	m_registration;
 	protected   Button			m_bSetSurfaces;
+
+	protected 	PuDouble 		m_threshold;
+
+	protected 	PuInteger		m_icp_points;
+
+	protected 	PuInteger		m_icp_iteration;
+
+	protected TextField mean_squared_error;
+
+	protected Checkbox m_cbUsePointToPlane;
+
+
+	protected Button m_bStartICP;
+	// task 2.1 step 1
+	private int icp_points = 20;
+	private Random random = new Random();
+	private 	double 		k = 1.5;
+	private int icp_iteration = 1;
 
 	/** Constructor */
 	public Registration_IP () {
@@ -46,19 +69,19 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 	 * The text is split at line breaks into individual lines on the dialog.
 	 */
 	public String getNotice() {
-		return "This text should explain what the workshop is about and how to use it.";
+		return "This tool allows for rigid transformations using the ICP algorithm. Please drag down the UI to see all the controls. Please first fill in" +
+				" the parameters and select the respective meshes you want to use.";
 	}
-	
+
 	/** Assign a parent object. */
 	public void setParent(PsUpdateIf parent) {
 		super.setParent(parent);
 		m_registration = (Registration)parent;
-		
+
 		addSubTitle("Select Surfaces to be Registered");
-		
+
 		Panel pGeometries = new Panel();
 		pGeometries.setLayout(new GridLayout(1, 2));
-
 		Panel Passive = new Panel();
 		Passive.setLayout(new BorderLayout());
 		Panel Active = new Panel();
@@ -74,22 +97,59 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		Passive.add(m_listPassive, BorderLayout.CENTER);
 		pGeometries.add(Passive);
 		add(pGeometries);
-		
+
 		Panel pSetSurfaces = new Panel(new BorderLayout());
 		m_bSetSurfaces = new Button("Set selected surfaces");
 		m_bSetSurfaces.addActionListener(this);
 		pSetSurfaces.add(m_bSetSurfaces, BorderLayout.CENTER);
 		add(pSetSurfaces);
-		
+
+		// task 2
+		m_threshold = new PuDouble("Threshold");
+		m_threshold.setDefBounds(-50,50,0.1,1);
+		m_threshold.setDefValue(k);
+		m_threshold.addUpdateListener(this);
+		m_threshold.init();
+		add(m_threshold.getInfoPanel());
+
+		m_icp_points = new PuInteger("ICP Points");
+		m_icp_points.setDefBounds(1,100,1,1);
+		m_icp_points.setDefValue(icp_points);
+		m_icp_points.addUpdateListener(this);
+		m_icp_points.init();
+		add(m_icp_points.getInfoPanel());
+
+		m_icp_iteration = new PuInteger("ICP Iteration");
+		m_icp_iteration.setDefBounds(1,50,1,1);
+		m_icp_iteration.setDefValue(icp_iteration);
+		m_icp_iteration.addUpdateListener(this);
+		m_icp_iteration.init();
+		add(m_icp_iteration.getInfoPanel());
+
+		m_cbUsePointToPlane = new Checkbox("Use Point-to-Plane");
+		add(m_cbUsePointToPlane);
+
+		m_bStartICP = new Button("Start ICP");
+		m_bStartICP.addActionListener(this);
+		Panel pStartICP = new Panel(new BorderLayout());
+		pStartICP.add(m_bStartICP, BorderLayout.CENTER);
+		add(pStartICP);
+
+		mean_squared_error = new TextField("MSE: ", 20);
+		mean_squared_error.setEditable(false);
+		Panel panel = new Panel(new FlowLayout(FlowLayout.CENTER));
+		panel.add(mean_squared_error);
+		add(panel);
+
 		updateGeomList();
 		validate();
 	}
-		
+
 	/** Initialisation */
 	public void init() {
 		super.init();
 		setTitle("Surface Registration");
-		
+
 	}
 
 	/** Set the list of geometries in the lists to the current state of the display. */
@@ -118,6 +178,20 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 			m_listActive.add(name);
 		}
 	}
+
+	public boolean update(Object event) {
+		if (event == m_threshold) {
+			k = m_threshold.getValue();
+			return true;
+		} else if (event == m_icp_points) {
+			icp_points = m_icp_points.getValue();
+			return true;
+		} else if (event == m_icp_iteration) {
+			icp_iteration = m_icp_iteration.getValue();
+			return true;
+		}else
+			return super.update(event);
+	}
 	/**
 	 * Handle action events fired by buttons etc.
 	 */
@@ -125,10 +199,203 @@ public class Registration_IP extends PjWorkshop_IP implements ActionListener{
 		Object source = event.getSource();
 		if (source == m_bSetSurfaces) {
 			m_registration.setGeometries((PgElementSet)m_geomList.elementAt(m_listActive.getSelectedIndex()),
-			(PgElementSet)m_geomList.elementAt(m_listPassive.getSelectedIndex()));
+					(PgElementSet)m_geomList.elementAt(m_listPassive.getSelectedIndex()));
+			return;
+		}
+		else if (source == m_bStartICP) {
+			performICP();
 			return;
 		}
 	}
+
+	// task 2
+	public void performICP() {
+		PgElementSet p = (PgElementSet) m_geomList.elementAt(m_listActive.getSelectedIndex());
+		PgElementSet q = (PgElementSet) m_geomList.elementAt(m_listPassive.getSelectedIndex());
+
+		for (int z = 0; z < icp_iteration; z++)
+		{
+			int[] selectedIndices = selectRandomVertices(p, icp_points);
+			ArrayList<PdVector> pVertices = new ArrayList<>();
+			ArrayList<PdVector> qVertices = new ArrayList<>();
+			ArrayList<Double> distances = new ArrayList<>();
+
+			for (int i : selectedIndices) {
+				PdVector pi = p.getVertex(i);
+				PdVector qi;
+
+				if (m_cbUsePointToPlane.getState()) {
+					qi = findClosestPlane(pi, q);;
+				} else {
+					qi = findClosestVertex(pi, q);
+				}
+
+				// Store vertices and distance
+				pVertices.add(pi);
+				qVertices.add(qi);
+				distances.add(pi.dist(qi));
+			}
+
+			Collections.sort(distances);
+			double medianDistance;
+			if (distances.size() % 2 == 0) {
+				medianDistance = (distances.get(distances.size() / 2 - 1) + distances.get(distances.size() / 2)) / 2.0;
+			} else {
+				medianDistance = distances.get(distances.size() / 2);
+			}
+
+			double threshold = k * medianDistance;
+
+			ArrayList<PdVector> newPVertices = new ArrayList<>();
+			ArrayList<PdVector> newQVertices = new ArrayList<>();
+
+			for (int i = 0; i < distances.size(); i++) {
+				if (distances.get(i) <= threshold) {
+					newPVertices.add(pVertices.get(i));
+					newQVertices.add(qVertices.get(i));
+				}
+			}
+
+			pVertices = newPVertices;
+			qVertices = newQVertices;
+
+			// task 2.3
+			// Compute centroids of P and Q points
+			PdVector centroidP = new PdVector(3);
+			PdVector centroidQ = new PdVector(3);
+			for (int i = 0; i < pVertices.size(); i++) {
+				centroidP.add(pVertices.get(i));
+				centroidQ.add(qVertices.get(i));
+			}
+			centroidP.multScalar(1.0 / pVertices.size());
+			centroidQ.multScalar(1.0 / qVertices.size());
+
+			// Build matrix M
+			PdMatrix M = new PdMatrix(3, 3);
+			for (int i = 0; i < pVertices.size(); i++) {
+				PdVector pCentroid = PdVector.subNew(pVertices.get(i), centroidP);
+				PdVector qCentroid = PdVector.subNew(qVertices.get(i), centroidQ);
+				PdMatrix pqT = outerProductNew(pCentroid, qCentroid);
+				M.add(pqT);
+			}
+
+			// compute SVD of M
+			Matrix jamaM = new Matrix(M.getEntries());
+			SingularValueDecomposition SVD = jamaM.svd();
+
+			// compute optimal rotation matrix R
+			// compute the determinant of VU^T
+			Matrix VUt = SVD.getV().times(SVD.getU().transpose());
+			double det = VUt.det();
+
+			Matrix correction = Matrix.identity(3, 3);
+			correction.set(2, 2, det);
+
+			// compute optimal rotation matrix R
+			Matrix R_jama = SVD.getV().times(correction).times(SVD.getU().transpose());
+			// convert Jama matrix to PdMatrix
+			PdMatrix R = new PdMatrix(R_jama.getArray());
+			PdMatrix R_temp = R;
+
+			// compute translation vector t
+			PdVector t = new PdVector(3);
+			PdVector temp = new PdVector(3);
+			R_temp.leftMultMatrix(temp, centroidP);
+			t = PdVector.subNew(centroidQ, temp);
+
+			// Apply the optimal rigid transformation to P
+			for (int i = 0; i < p.getNumVertices(); i++) {
+				PdVector pi = p.getVertex(i);
+				PdVector temp_2 = new PdVector(3);
+				R.leftMultMatrix(temp_2, pi);
+				PdVector qi = temp_2;
+				qi.add(t);
+				p.setVertex(i, qi);
+			}
+
+			// update the display
+			p.update(p);
+
+			// calculate MSE
+			float mean = 0;
+			for (int i = 0; i < pVertices.size(); i++) {
+				// This is after applying the rotation and translation
+				PdVector pi = pVertices.get(i);
+				PdVector qi = qVertices.get(i);
+				PdVector result = new PdVector(i);
+				R.leftMultMatrix(result, pi);
+				result.add(t);
+				mean += PdVector.sqrDist(result, qi);
+			}
+			mean = mean / (2.0f * p.getNumVertices());
+			mean_squared_error.setText("MSE: " + mean);
+
+		}
+	}
+
+	private int[] selectRandomVertices(PgElementSet mesh, int numVertices) {
+		int[] indices = new int[numVertices];
+		for (int i = 0; i < numVertices; i++) {
+			indices[i] = random.nextInt(mesh.getNumVertices());
+		}
+		return indices;
+	}
+
+	private PdVector findClosestVertex(PdVector point, PgElementSet mesh) {
+		PdVector closest = null;
+		double closestDistance = Double.MAX_VALUE;
+
+		// brute force search
+		for (int i = 0; i < mesh.getNumVertices(); i++) {
+			PdVector vertex = mesh.getVertex(i);
+			double distance = point.dist(vertex);
+			if (distance < closestDistance) {
+				closest = vertex;
+				closestDistance = distance;
+			}
+		}
+
+		return closest;
+	}
+
+
+	private PdVector findClosestPlane(PdVector point, PgElementSet mesh) {
+		PdVector closest = null;
+		double closestDistance = Double.MAX_VALUE;
+
+		for (int i = 0; i < mesh.getNumElements(); i++) {
+			// get vertices of the element
+			PdVector[] vertices = new PdVector[3];
+			for (int j = 0; j < 3; j++) {
+				vertices[j] = mesh.getElementVertices(i)[j];
+			}
+			PdVector normal = PdVector.crossNew(PdVector.subNew(vertices[1], vertices[0]), PdVector.subNew(vertices[2], vertices[0]));
+			normal.normalize();
+
+			// Compute the distance from the point to the plane
+			double distance = Math.abs(PdVector.subNew(point, vertices[0]).dot(normal));
+
+			if (distance < closestDistance) {
+				// If this plane is closer, project the point onto the plane to get the "closest" point
+				normal.multScalar(distance);
+				closest = PdVector.subNew(point, normal);
+				closestDistance = distance;
+			}
+		}
+
+		return closest;
+	}
+
+	public static PdMatrix outerProductNew(PdVector a, PdVector b) {
+		PdMatrix result = new PdMatrix(3, 3);
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				result.setEntry(i, j, a.getEntry(i) * b.getEntry(j));
+			}
+		}
+		return result;
+	}
+
 	/**
 	 * Get information which bottom buttons a dialog should create
 	 * when showing this info panel.
