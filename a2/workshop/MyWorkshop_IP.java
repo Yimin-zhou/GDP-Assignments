@@ -810,23 +810,14 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
         System.out.println("matrixM cols: " + matrixM.getNumCols() + " matrixM rows: " + matrixM.getNumRows());
         System.out.println("s1 cols: " + s1.getNumCols() + " s1 rows: " + s1.getNumRows());
         System.out.println("rightX size: " + rightX.getSize() + " rightY size: " + rightY.getSize() + " rightZ size: " + rightZ.getSize());
+		leftHand.validate();
 
         try {
     		
-    		long pointerToFactorization = PnMumpsSolver.factor(s1, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
+    		long pointerToFactorization = PnMumpsSolver.factor(leftHand, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
 			PnMumpsSolver.solve(pointerToFactorization, x, rightX);
 			PnMumpsSolver.solve(pointerToFactorization, y, rightY);
 			PnMumpsSolver.solve(pointerToFactorization, z, rightZ);
-
-            // PnMumpsSolver.solve(leftHand, x, rightX, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
-            // PnMumpsSolver.solve(leftHand, y, rightY, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
-            // PnMumpsSolver.solve(leftHand, z, rightZ, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
-
-            // PnBiconjugateGradient solver = new PnBiconjugateGradient();
-
-            // solver.solve(leftHand, x, rightX);
-            // solver.solve(leftHand, y, rightY);
-            // solver.solve(leftHand, z, rightZ);
         } catch (Exception e) {
             e.printStackTrace();
 			System.out.println("Error in solving the linear system");
@@ -921,97 +912,97 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
         return res;
     }
 
-	// private void computeSurface() {
-	// 	PgElementSet mesh = m_ws.m_geom;
-	// 	m_GMatrix = calculateGmatrix(mesh);
-	// 	// PnSparseMatrix G_alt = meshToGradient(mesh);
-	// 	// for (int i = 0; i < mesh.getNumElements(); i++) {
-	// 	// 	for (int j = 0; j < mesh.getNumVertices(); j++) {
-	// 	// 		if (G_alt.getEntry(i, j) != m_GMatrix.getEntry(i, j))
-	// 	// 			System.out.println("entry: " + G_alt.getEntry(i, j) + " does not match entry: " + m_GMatrix.getEntry(i, j));
-	// 	// 	}
-	// 	// }
-	// 	System.out.println("entries match");
-	// 	PdMatrix grads = getGradients();
-	// 	PnSparseMatrix G = m_GMatrix;
-	// 	PnSparseMatrix G_T = G.transposeNew();
-	// 	PnSparseMatrix M = calculateMVmatrix(mesh);
-	// 	PnSparseMatrix G_TM = PnSparseMatrix.multMatrices(G_T, M, null);
-	// 	PnSparseMatrix S = calculateSmatrix(mesh);
-	// 	// System.out.println("M cols: " + M.getNumCols() + " M rows: " + M.getNumRows());
-	// 	// System.out.println("G_TM cols: " + G_TM.getNumCols() + " G_TM rows: " + G_TM.getNumRows());
-	// 	// System.out.println("S cols: " + S.getNumCols() + " S rows: " + S.getNumRows());
+	private void computeSurface() {
+		PgElementSet mesh = m_ws.m_geom;
+		m_GMatrix = calculateGmatrix(mesh);
+		// PnSparseMatrix G_alt = meshToGradient(mesh);
+		// for (int i = 0; i < mesh.getNumElements(); i++) {
+		// 	for (int j = 0; j < mesh.getNumVertices(); j++) {
+		// 		if (G_alt.getEntry(i, j) != m_GMatrix.getEntry(i, j))
+		// 			System.out.println("entry: " + G_alt.getEntry(i, j) + " does not match entry: " + m_GMatrix.getEntry(i, j));
+		// 	}
+		// }
+		System.out.println("entries match");
+		PdMatrix grads = getGradients();
+		PnSparseMatrix G = m_GMatrix;
+		PnSparseMatrix G_T = G.transposeNew();
+		PnSparseMatrix M = calculateMVmatrix(mesh);
+		PnSparseMatrix G_TM = PnSparseMatrix.multMatrices(G_T, M, null);
+		PnSparseMatrix S = calculateSmatrix(mesh);
+		// System.out.println("M cols: " + M.getNumCols() + " M rows: " + M.getNumRows());
+		// System.out.println("G_TM cols: " + G_TM.getNumCols() + " G_TM rows: " + G_TM.getNumRows());
+		// System.out.println("S cols: " + S.getNumCols() + " S rows: " + S.getNumRows());
 
-	// 	PdVector g_x = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(0), null);
-	// 	PdVector g_y = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(1), null);
-	// 	PdVector g_z = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(2), null);
+		PdVector g_x = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(0), null);
+		PdVector g_y = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(1), null);
+		PdVector g_z = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(2), null);
 
-	// 	PdVector v_x = new PdVector(mesh.getNumVertices());
-	// 	PdVector v_y = new PdVector(mesh.getNumVertices());
-	// 	PdVector v_z = new PdVector(mesh.getNumVertices());
+		PdVector v_x = new PdVector(mesh.getNumVertices());
+		PdVector v_y = new PdVector(mesh.getNumVertices());
+		PdVector v_z = new PdVector(mesh.getNumVertices());
 
-	// 	// System.out.println("g_x coords: " + g_x.getSize() + " g_y coords: " + g_y.getSize() + " g_z coords: " + g_z.getSize());
+		// System.out.println("g_x coords: " + g_x.getSize() + " g_y coords: " + g_y.getSize() + " g_z coords: " + g_z.getSize());
 
-	// 	try {
-	// 		long factorization = dev6.numeric.PnMumpsSolver.factor(S, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
-	// 		dev6.numeric.PnMumpsSolver.solve(factorization, v_x, g_x);
-	// 		dev6.numeric.PnMumpsSolver.solve(factorization, v_y, g_y);
-	// 		dev6.numeric.PnMumpsSolver.solve(factorization, v_z, g_z);
+		try {
+			long factorization = dev6.numeric.PnMumpsSolver.factor(S, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
+			dev6.numeric.PnMumpsSolver.solve(factorization, v_x, g_x);
+			dev6.numeric.PnMumpsSolver.solve(factorization, v_y, g_y);
+			dev6.numeric.PnMumpsSolver.solve(factorization, v_z, g_z);
 
-	// 	} catch (Exception e) {
-	// 		e.printStackTrace();
-	// 		System.out.println("solving did not succeed");
-	// 	}
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.out.println("solving did not succeed");
+		}
 
-	// 	// System.out.println("v_x coords: " + v_x.getSize() + " v_y coords: " + v_y.getSize() + " v_z coords: " + v_z.getSize());
-	// 	PdVector[] vertices = new PdVector[mesh.getNumVertices()];
-	// 	PdMatrix verticesM = new PdMatrix(mesh.getNumVertices(), 3);
-	// 	verticesM.setColumn(0, v_x);
-	// 	verticesM.setColumn(1, v_y);
-	// 	verticesM.setColumn(2, v_z);
-	// 	for (int i = 0; i < mesh.getNumVertices(); i++) {
-	// 		vertices[i] = verticesM.getRow(i);
-	// 	}
-	// 	mesh.setVertices(vertices);
-	// 	mesh.update(mesh);
-	// }
+		// System.out.println("v_x coords: " + v_x.getSize() + " v_y coords: " + v_y.getSize() + " v_z coords: " + v_z.getSize());
+		PdVector[] vertices = new PdVector[mesh.getNumVertices()];
+		PdMatrix verticesM = new PdMatrix(mesh.getNumVertices(), 3);
+		verticesM.setColumn(0, v_x);
+		verticesM.setColumn(1, v_y);
+		verticesM.setColumn(2, v_z);
+		for (int i = 0; i < mesh.getNumVertices(); i++) {
+			vertices[i] = verticesM.getRow(i);
+		}
+		mesh.setVertices(vertices);
+		mesh.update(mesh);
+	}
 
-	// private PdMatrix getGradients() {
-	// 	PgElementSet mesh = m_ws.m_geom;
-	// 	PnSparseMatrix G = m_GMatrix;
-	// 	PdMatrix vertices = new PdMatrix(mesh.getNumVertices(), 3);
-	// 	PdVector v_x = new PdVector(mesh.getNumVertices());
+	private PdMatrix getGradients() {
+		PgElementSet mesh = m_ws.m_geom;
+		PnSparseMatrix G = m_GMatrix;
+		PdMatrix vertices = new PdMatrix(mesh.getNumVertices(), 3);
+		PdVector v_x = new PdVector(mesh.getNumVertices());
 
-	// 	for (int i = 0; i < mesh.getNumVertices(); i++) {
-	// 		v_x.setEntry(i, mesh.getVertex(i).getEntry(0));
-	// 		vertices.setRow(i, mesh.getVertex(i));
-	// 	}
+		for (int i = 0; i < mesh.getNumVertices(); i++) {
+			v_x.setEntry(i, mesh.getVertex(i).getEntry(0));
+			vertices.setRow(i, mesh.getVertex(i));
+		}
 
-	// 	PdMatrix grads = new PdMatrix(m_GMatrix.getNumRows(), 3);
-	// 	PdVector xGradient = PnSparseMatrix.rightMultVector(G, v_x, null);
-	// 	for (int i = 0; i < 3; i++) {
-	// 		grads.setColumn(i, m_GMatrix.leftMultMatrix(null, vertices.getColumn(i)));
-	// 	}
-	// 	//System.out.println("m_GMatrix: " + m_GMatrix.toShortString());
-	// 	// //grads.mult(m_GMatrix, vertices);
-	// 	// System.out.println("grads cols: " + grads.getNumCols() + " grads rows: " + grads.getNumRows());
-	// 	// System.out.println("xGradient: " + xGradient.toShortString());
+		PdMatrix grads = new PdMatrix(m_GMatrix.getNumRows(), 3);
+		PdVector xGradient = PnSparseMatrix.rightMultVector(G, v_x, null);
+		for (int i = 0; i < 3; i++) {
+			grads.setColumn(i, m_GMatrix.leftMultMatrix(null, vertices.getColumn(i)));
+		}
+		//System.out.println("m_GMatrix: " + m_GMatrix.toShortString());
+		// //grads.mult(m_GMatrix, vertices);
+		// System.out.println("grads cols: " + grads.getNumCols() + " grads rows: " + grads.getNumRows());
+		// System.out.println("xGradient: " + xGradient.toShortString());
 
-	// 	for (int i = 0; i < mesh.getNumElements(); i++) {
-	// 		if (mesh.getElement(i).hasTag(PsObject.IS_SELECTED)) {
-	// 			PdMatrix elementM = new PdMatrix(3, 3);
-	// 			for (int j = 0; j < 3; j++) {
-	// 				elementM.setColumn(j, grads.getRow(i*3+j));
-	// 			}
-	// 			elementM.rightMult(m_inputMatrix);
-	// 			for (int j = 0; j < 3; j++) {
-	// 				grads.setRow(i*3+j, elementM.getColumn(j));
-	// 			}
-	// 		}
-	// 	}
+		for (int i = 0; i < mesh.getNumElements(); i++) {
+			if (mesh.getElement(i).hasTag(PsObject.IS_SELECTED)) {
+				PdMatrix elementM = new PdMatrix(3, 3);
+				for (int j = 0; j < 3; j++) {
+					elementM.setColumn(j, grads.getRow(i*3+j));
+				}
+				elementM.rightMult(m_inputMatrix);
+				for (int j = 0; j < 3; j++) {
+					grads.setRow(i*3+j, elementM.getColumn(j));
+				}
+			}
+		}
 
-	// 	return grads;
-	// }
+		return grads;
+	}
 	
 	/**
 	 * Get information which bottom buttons a dialog should create
