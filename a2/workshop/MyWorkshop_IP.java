@@ -268,11 +268,9 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 		PnSparseMatrix G = new PnSparseMatrix(3 * nTriangles, nVertices);
 
-		// Loop over all triangles in the mesh
 		for (int i = 0; i < nTriangles; i++) {
 			PiVector triangle = mesh.getElement(i);
 
-			// Get the vertices and indices of the triangle
 			List<Integer> vertexIndices = new ArrayList<Integer>();
 			PdVector[] vertices = new PdVector[3];
 			for (int j = 0; j < 3; j++) {
@@ -280,20 +278,16 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 				vertexIndices.add(triangle.getEntry(j));
 			}
 			
-			// Calculate the gradient of the function on this triangle
 			PdMatrix gradient = calculateTriangleGradient(vertices, vertexIndices);
 
 			// Add the gradient to the G matrix (vertical stacking), gradient is 3x3 matrix
 			for (int j = 0; j < 3; j++) {
 				int ind = vertexIndices.get(j);
 				for (int k = 0; k < 3; k++) {
-					// set entry in gradientMatrix_true at correct row and column position
 					G.setEntry(i * 3 + k, ind, gradient.getEntry(k, j));
 				}
 			}
 		}
-		// print G matrix
-		// System.out.println("G matrix: " + G.toString());
 		m_GMatrixResult.setText("Calculated!");
 
 		return G;
@@ -301,10 +295,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 	// task 1.1 G matrix (Gradient of a function on a triangle)
 	private PdMatrix calculateTriangleGradient(PdVector[] vertices, List<Integer> vertexIndices) {
-		// Calculate the area of the triangle
 		double area = calculateTriangleArea(vertices);
-
-		// Calculate the gradient as a 3x3 matrix
 		PdMatrix gradientMatrix = new PdMatrix(3, 3);
 
 		// Calculate the triangle normal, the normal is consistent with the order of the vertices
@@ -376,7 +367,6 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		g0.setColumn(0, g0_0);
 		g0.setColumn(1, g0_1);
 		g0.setColumn(2, g0_2);
-		// System.out.println("g0: " + g0.toString());
 
 		// Triangle 1
 		double area1 = calculateTriangleArea(new PdVector[] { mesh.getVertex(0), mesh.getVertex(1), mesh.getVertex(3) });
@@ -415,14 +405,6 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 				}
 			}
 		}
-
-		// PnSparseMatrix G_test = calculateGmatrix(mesh);
-		// PnSparseMatrix G_alt = meshToGradient(mesh);
-		// System.out.println("G_alt: " + G_alt.toString());
-		// System.out.println("G: " + G_test.toString());
-
-		// print gradient matrix
-		// System.out.println("Gradient_true matrix: " + gradientMatrix_true.toString());
 
 		// Calculate the gradient matrix using the function
 		PnSparseMatrix gradientMatrix_calculated = calculateGmatrix(mesh);
@@ -497,12 +479,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		L_true.setEntry(2, 1, -1);
 		L_true.setEntry(2, 2, 2);
 	
-
-		// System.out.println("L_true matrix: " + L_true.toString());
-
-		// Calculate the gradient matrix using the function
 		PnSparseMatrix L_calculated = calculateLmatrix(mesh);
-		// System.out.println("L_calculated matrix: " + L_calculated.toString());
 
 		// Compare the two matrices
 		for (int i = 0; i < 3; i++) {
@@ -515,41 +492,6 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		}
 		m_LMatrixResult.setText("Success");
 	}
-
-	// task 1.3 Compute Mass Matrix M
-	// private PnSparseMatrix calculateMassMatrix(PgElementSet mesh) {
-	// 	m_MMatrixResult.setText("Calculating...");
-
-	// 	int nVertices = mesh.getNumVertices();
-	// 	PnSparseMatrix M = new PnSparseMatrix(nVertices, nVertices);
-	// 	List<Double> areas = new ArrayList<>(nVertices);
-
-	// 	// Initialize areas list
-	// 	for (int i = 0; i < nVertices; i++) {
-	// 		areas.add(0.0);
-	// 	}
-
-	// 	// Populate areas list
-	// 	for (int i = 0; i < mesh.getNumElements(); i++) {
-	// 		PiVector triangle = mesh.getElement(i);
-	// 		PdVector p1 = mesh.getVertex(triangle.getEntry(0));
-	// 		PdVector p2 = mesh.getVertex(triangle.getEntry(1));
-	// 		PdVector p3 = mesh.getVertex(triangle.getEntry(2));
-	// 		PdVector[] vertices = {p1, p2, p3}; 
-	// 		double area = calculateTriangleArea(vertices);
-	// 		areas.set(triangle.getEntry(0), areas.get(triangle.getEntry(0)) + area);
-	// 		areas.set(triangle.getEntry(1), areas.get(triangle.getEntry(1)) + area);
-	// 		areas.set(triangle.getEntry(2), areas.get(triangle.getEntry(2)) + area);
-	// 	}
-
-	// 	// Populate Mass matrix
-	// 	for (int i = 0; i < nVertices; i++) {
-	// 		M.setEntry(i, i, areas.get(i) / 3);
-	// 	}
-
-	// 	m_MMatrixResult.setText("Calculated!");
-	// 	return M;
-	// }
 
 	// task 1.3 Compute Mass Matrix M
 	private PnSparseMatrix calculateMVmatrix(PgElementSet mesh) {
@@ -589,24 +531,19 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 		// Manually calculate the M matrix
 		PnSparseMatrix M_true = new PnSparseMatrix(3, 3);
-		M_true.setEntry(0, 0, 0.5 / 3);
+		M_true.setEntry(0, 0, 0.5);
 		M_true.setEntry(0, 1, 0);
 		M_true.setEntry(0, 2, 0);
 		M_true.setEntry(1, 0, 0);
-		M_true.setEntry(1, 1,  0.5 / 3);
+		M_true.setEntry(1, 1,  0.5);
 		M_true.setEntry(1, 2, 0);
 		M_true.setEntry(2, 0, 0);
 		M_true.setEntry(2, 1, 0);
-		M_true.setEntry(2, 2,  0.5 / 3);
+		M_true.setEntry(2, 2,  0.5);
 	
 
-		// System.out.println("M_true matrix: " + M_true.toString());
-
-		// Calculate the gradient matrix using the function
 		PnSparseMatrix M_calculated = calculateMVmatrix(mesh);
-		// System.out.println("M_calculated matrix: " + M_calculated.toString());
 
-		// Compare the two matrices
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
 				if (Math.abs(M_true.getEntry(i, j) - M_calculated.getEntry(i, j)) > 0.0001) {
@@ -633,7 +570,6 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 	// task 1.4 Compute the cotangent matrix S (Test S using a generated triangle mesh)
 	private void testSmatrix() {
-		// Create a triangle mesh
 		PgElementSet mesh = new PgElementSet(3);
 
 		mesh.addVertex(new PdVector(0, 0, 0)); // p1
@@ -644,24 +580,18 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 		// Manually calculate the S matrix
 		PnSparseMatrix S_true = new PnSparseMatrix(3, 3);
-		S_true.setEntry(0, 0, 1.0/3);
-		S_true.setEntry(0, 1, -0.5/3);
-		S_true.setEntry(0, 2, -0.5/3);
-		S_true.setEntry(1, 0, -0.5/3);
-		S_true.setEntry(1, 1, 0.5/3);
+		S_true.setEntry(0, 0, 1.0);
+		S_true.setEntry(0, 1, -0.5);
+		S_true.setEntry(0, 2, -0.5);
+		S_true.setEntry(1, 0, -0.5);
+		S_true.setEntry(1, 1, 0.5);
 		S_true.setEntry(1, 2, 0);
-		S_true.setEntry(2, 0, -0.5/3);
+		S_true.setEntry(2, 0, -0.5);
 		S_true.setEntry(2, 1, 0);
-		S_true.setEntry(2, 2, 0.5/3);
+		S_true.setEntry(2, 2, 0.5);
 
-
-		// System.out.println("S_true matrix: " + S_true.toString());
-
-		// Calculate the gradient matrix using the function
 		PnSparseMatrix S_calculated = calculateSmatrix(mesh);
-		// System.out.println("S_calculated matrix: " + S_calculated.toString());
 
-		// Compare the two matrices
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {
 				if (Math.abs(S_true.getEntry(i, j) - S_calculated.getEntry(i, j)) > 0.0001) {
