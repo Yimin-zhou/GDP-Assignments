@@ -18,7 +18,8 @@ public class PgElementSet_Menu extends PgPointSet_Menu {
 	
 	private enum MenuEntry{
 		MyWorkshop			("MyWorkshop..."),
-		Registration		("Surface Registration...")
+		Registration		("Surface Registration..."),
+		ShapeDeformation 	("Shape deformation...")
 		// Additional entries...
 		;
 		protected final String name;
@@ -87,6 +88,18 @@ public class PgElementSet_Menu extends PgPointSet_Menu {
 			dialog = new PjWorkshop_Dialog(false);
 			dialog.setParent(reg);
 			dialog.update(reg);
+			dialog.setVisible(true);
+			break;
+		case ShapeDeformation:
+			ShapeDeformation shapeDeformation = new ShapeDeformation();
+			shapeDeformation.setGeometry(m_elementSet);
+			if (currDisp == null) {
+				if (PsDebug.WARNING) PsDebug.warning("missing display.");
+			} else
+				shapeDeformation.setDisplay(currDisp);
+			dialog = new PjWorkshop_Dialog(false);
+			dialog.setParent(shapeDeformation);
+			dialog.update(shapeDeformation);
 			dialog.setVisible(true);
 			break;
 		}
