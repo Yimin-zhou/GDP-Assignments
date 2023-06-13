@@ -7,4 +7,4 @@ javac -classpath jars\javaview.jar;jars\jvx.jar;. test\*.java
 
 
 set jv_jar=jars/javaview.jar;jars/jvx.jar;jars/vgpapp.jar;jars\Jama-1.0.3.jar;.
-start java -cp %jv_jar% -Djava.library.path="dll" -Xmx1024m javaview model="models/cube_768.obj" codebase=. archive.dev=show %*
+start java -cp %jv_jar% -Djava.library.path="dll" -Xmx1024m javaview model="models/bunny2000.obj" codebase=. archive.dev=show %*

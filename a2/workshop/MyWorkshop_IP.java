@@ -9,6 +9,8 @@ import java.awt.geom.Area;
 import java.util.*;
 import java.util.List;
 
+import javax.swing.text.html.parser.Element;
+
 //import org.omg.Messaging.SYNC_WITH_TRANSPORT;
 
 import dev6.numeric.PnMumpsSolver;
@@ -27,6 +29,7 @@ import jvx.project.PjWorkshop_IP;
 import jv.vecmath.PdVector;
 import jv.geom.PgElementSet;
 import jv.vecmath.PdMatrix;
+import jvx.numeric.PnBiconjugateGradient;
 
 public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
@@ -38,22 +41,22 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	// task 1.1 Compute G sparse matrix
 	protected Button m_bCalculateGMatrix;
 	protected TextField m_GMatrixResult;
-	protected PdMatrix m_GMatrix;
+	protected PnSparseMatrix m_GMatrix;
 
 	// task 1.2 Compute combinatorial Laplacian matrix L
 	protected Button m_bCalculateLMatrix;
 	protected TextField m_LMatrixResult;
-	protected PdMatrix m_LMatrix; // Combinatorial Laplacian matrix
+	protected PnSparseMatrix m_LMatrix; // Combinatorial Laplacian matrix
 
 	// task 1.3 Compute Mass Matrix M
 	protected Button m_bCalculateMMatrix;
 	protected TextField m_MMatrixResult;
-	protected PdMatrix m_MMatrix; // Mass matrix
+	protected PnSparseMatrix m_MMatrix; // Mass matrix
 
 	// task 1.4 Compute Cotangent matrix S
 	protected Button m_bCalculateSMatrix;
 	protected TextField m_SMatrixResult;
-	protected PdMatrix m_SMatrix; // Cotangent matrix
+	protected PnSparseMatrix m_SMatrix; // Cotangent matrix
 
 	// task 2 Input Matrix A
 	protected PdVector_IP m_vRow1;
@@ -213,36 +216,36 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 		// task 1.1 calculate G	
 		else if (source == m_bCalculateGMatrix) {
-			m_GMatrix = calculateGMatrix(m_ws.m_geom);
-            testGMatrix();
+			m_GMatrix = calculateGmatrix(m_ws.m_geom);
+            testGmatrix();
             return;
         }
 
 		// task 1.2 calculate L
 		else if (source == m_bCalculateLMatrix) {
-			m_LMatrix = calculateLMatrix(m_ws.m_geom);
-			testLMatrix();
+			m_LMatrix = calculateLmatrix(m_ws.m_geom);
+			testLmatrix();
 			return;
 		}
 
 		// task 1.3 calculate M
 		else if (source == m_bCalculateMMatrix) {
-			m_MMatrix = calculateMassMatrix(m_ws.m_geom);
-			testMassMatrix();
+			m_MMatrix = calculateMVmatrix(m_ws.m_geom);
+			testMVmatrix();
 			return;
 		}
 
 		// task 1.4 calculate S
 		else if (source == m_bCalculateSMatrix) {
-			// m_SMatrix = calculateSMatrix(m_ws.m_geom);
-			testSMatrix();
+			m_SMatrix = calculateSmatrix(m_ws.m_geom);
+			testSmatrix();
 			return;
 		}
 
 		// task 2
 		else if (source == m_bComputeSurface) {
 			System.out.println("Compute deformed surface");
-			computeSurface();
+			deformSelected(m_inputMatrix);
 		}
 
 		else if (source == m_bResetSurface) {
@@ -256,13 +259,13 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	}
 
 	// task 1.1 G matrix
-	private PdMatrix calculateGMatrix(PgElementSet mesh) {
+	private PnSparseMatrix calculateGmatrix(PgElementSet mesh) {
 		m_GMatrixResult.setText("Calculating...");
 
 		int nVertices = mesh.getNumVertices();
 		int nTriangles = mesh.getNumElements();
 
-		PdMatrix G = new PdMatrix(3 * nTriangles, nVertices);
+		PnSparseMatrix G = new PnSparseMatrix(3 * nTriangles, nVertices);
 
 		// Loop over all triangles in the mesh
 		for (int i = 0; i < mesh.getNumElements(); i++) {
@@ -305,36 +308,20 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 	// task 1.1 G matrix (Gradient of a function on a triangle)
 	private PdMatrix calculateTriangleGradient(PdVector[] vertices, List<Integer> vertexIndices) {
-		// Make vertex and index pairs
-		Map<PdVector, Integer> vertexIndexMap = new HashMap<PdVector, Integer>();
-		for (int i = 0; i < 3; i++) {
-			vertexIndexMap.put(vertices[i], vertexIndices.get(i));
-		}
-
-		// Order the vertices by index, in ascending order
-		List<Map.Entry<PdVector, Integer>> entryList = new ArrayList<>(vertexIndexMap.entrySet());
-		entryList.sort(Map.Entry.comparingByValue());
-
-		// Get the vertices in the correct order
-		PdVector[] orderedVertices = new PdVector[3];
-		for (int i = 0; i < 3; i++) {
-			orderedVertices[i] = entryList.get(i).getKey();
-		}
-
 		// Calculate the area of the triangle
-		double area = calculateTriangleArea(orderedVertices);
+		double area = calculateTriangleArea(vertices);
 
 		// Calculate the gradient as a 3x3 matrix
 		PdMatrix gradientMatrix = new PdMatrix(3, 3);
 
 		// Calculate the triangle normal, the normal is consistent with the order of the vertices
-		PdVector triangleNormal = PdVector.crossNew(PdVector.subNew(orderedVertices[1], orderedVertices[0]), PdVector.subNew(orderedVertices[2], orderedVertices[0]));
+		PdVector triangleNormal = PdVector.crossNew(PdVector.subNew(vertices[1], vertices[0]), PdVector.subNew(vertices[2], vertices[0]));
 		triangleNormal.normalize();
 
 		// Calculate the gradient of the function on the triangle
 		for (int i = 0; i < 3; i++) {
 			// Edge vector, following the order of the vertices
-			PdVector edgeVector = PdVector.subNew(orderedVertices[(i + 2) % 3], orderedVertices[(i + 1) % 3]);
+			PdVector edgeVector = PdVector.subNew(vertices[(i + 2) % 3], vertices[(i + 1) % 3]);
 
 			// Calculate the gradient of the function on the triangle
 			PdVector gradient = PdVector.crossNew(triangleNormal, edgeVector);
@@ -350,19 +337,19 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	 * Computes matrix G for a triangle mesh (task 1)
 	 * Where G maps a continuous linear polynomial over all triangles of a mesh to its gradient vectors
 	 */
-	public PnSparseMatrix meshToGradient() {
+	public PnSparseMatrix meshToGradient(PgElementSet mesh) {
 
 		// 3#T x #V matrix
-		PnSparseMatrix G = new PnSparseMatrix(m_ws.m_geom.getNumElements() * 3, m_ws.m_geom.getNumVertices(), 3);
-		PiVector[] triangles = m_ws.m_geom.getElements();
+		PnSparseMatrix G = new PnSparseMatrix(mesh.getNumElements() * 3, mesh.getNumVertices(), 3);
+		PiVector[] triangles = mesh.getElements();
 
 		for(int triangleIdx = 0; triangleIdx < triangles.length; triangleIdx++) {
 			PiVector triangle = triangles[triangleIdx];
 
 			PdMatrix subGradient = triangleToGradient(new PdVector[]{
-					m_ws.m_geom.getVertex(triangle.getEntry(0)),
-					m_ws.m_geom.getVertex(triangle.getEntry(1)),
-					m_ws.m_geom.getVertex(triangle.getEntry(2))});
+					mesh.getVertex(triangle.getEntry(0)),
+					mesh.getVertex(triangle.getEntry(1)),
+					mesh.getVertex(triangle.getEntry(2))});
 
 			for(int columnIdx = 0; columnIdx < 3; columnIdx++) {
 				int column = 3 * triangleIdx;
@@ -419,7 +406,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	}
 
 	// task 1.1 G matrix (Test G using a generated triangle mesh)
-	private void testGMatrix() {
+	private void testGmatrix() {
 		// Create a 2 triangle mesh
 		PgElementSet mesh = new PgElementSet(3);
 
@@ -500,17 +487,23 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 			}
 		}
 
+		// PnSparseMatrix G_test = calculateGmatrix(mesh);
+		// PnSparseMatrix G_alt = meshToGradient(mesh);
+		// System.out.println("G_alt: " + G_alt.toString());
+		// System.out.println("G: " + G_test.toString());
+
 		// print gradient matrix
 		// System.out.println("Gradient_true matrix: " + gradientMatrix_true.toString());
 
 		// Calculate the gradient matrix using the function
-		PdMatrix gradientMatrix_calculated = calculateGMatrix(mesh);
+		PnSparseMatrix gradientMatrix_calculated = calculateGmatrix(mesh);
 		// System.out.println("Gradient_calculated matrix: " + gradientMatrix_calculated.toString());
 
+		PnSparseMatrix gradientMatrix_true_ = new PnSparseMatrix(gradientMatrix_true);
 		// Compare the two gradient matrices
 		for (int i = 0; i < 6; i++) {
 			for (int j = 0; j < 4; j++) {
-				if (Math.abs(gradientMatrix_true.getEntry(i, j) - gradientMatrix_calculated.getEntry(i, j)) > 0.0001) {
+				if (Math.abs(gradientMatrix_true_.getEntry(i, j) - gradientMatrix_calculated.getEntry(i, j)) > 0.0001) {
 					m_GMatrixResult.setText("Failed");
 					return;
 				}
@@ -520,10 +513,10 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	}
 
 	// task 1.2 L matrix (Calculate the Combinatorial Laplacian matrix)
-	private PdMatrix calculateLMatrix(PgElementSet mesh) {
+	private PnSparseMatrix calculateLmatrix(PgElementSet mesh) {
 		m_LMatrixResult.setText("Calculating...");
 		int nVertices = mesh.getNumVertices();
-		PdMatrix L = new PdMatrix(nVertices, nVertices);
+		PnSparseMatrix L = new PnSparseMatrix(nVertices, nVertices);
 		List<Set<Integer>> neighbors = new ArrayList<>(nVertices);
 
 		// Initialize neighbors sets
@@ -553,7 +546,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 
 
 	// task 1.2 L matrix (Test L using a generated triangle mesh)
-	private void testLMatrix() {
+	private void testLmatrix() {
 		// Create a triangle mesh
 		PgElementSet mesh = new PgElementSet(3);
 
@@ -564,7 +557,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		mesh.addElement(new PiVector(0, 1, 2)); // a triangle
 
 		// Manually calculate the L matrix
-		PdMatrix L_true = new PdMatrix(3, 3);
+		PnSparseMatrix L_true = new PnSparseMatrix(3, 3);
 		L_true.setEntry(0, 0, 2);
 		L_true.setEntry(0, 1, -1);
 		L_true.setEntry(0, 2, -1);
@@ -579,7 +572,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		// System.out.println("L_true matrix: " + L_true.toString());
 
 		// Calculate the gradient matrix using the function
-		PdMatrix L_calculated = calculateLMatrix(mesh);
+		PnSparseMatrix L_calculated = calculateLmatrix(mesh);
 		// System.out.println("L_calculated matrix: " + L_calculated.toString());
 
 		// Compare the two matrices
@@ -595,46 +588,46 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	}
 
 	// task 1.3 Compute Mass Matrix M
-	private PdMatrix calculateMassMatrix(PgElementSet mesh) {
-		m_MMatrixResult.setText("Calculating...");
+	// private PnSparseMatrix calculateMassMatrix(PgElementSet mesh) {
+	// 	m_MMatrixResult.setText("Calculating...");
 
-		int nVertices = mesh.getNumVertices();
-		PdMatrix M = new PdMatrix(nVertices, nVertices);
-		List<Double> areas = new ArrayList<>(nVertices);
+	// 	int nVertices = mesh.getNumVertices();
+	// 	PnSparseMatrix M = new PnSparseMatrix(nVertices, nVertices);
+	// 	List<Double> areas = new ArrayList<>(nVertices);
 
-		// Initialize areas list
-		for (int i = 0; i < nVertices; i++) {
-			areas.add(0.0);
-		}
+	// 	// Initialize areas list
+	// 	for (int i = 0; i < nVertices; i++) {
+	// 		areas.add(0.0);
+	// 	}
 
-		// Populate areas list
-		for (int i = 0; i < mesh.getNumElements(); i++) {
-			PiVector triangle = mesh.getElement(i);
-			PdVector p1 = mesh.getVertex(triangle.getEntry(0));
-			PdVector p2 = mesh.getVertex(triangle.getEntry(1));
-			PdVector p3 = mesh.getVertex(triangle.getEntry(2));
-			PdVector[] vertices = {p1, p2, p3}; 
-			double area = calculateTriangleArea(vertices);
-			areas.set(triangle.getEntry(0), areas.get(triangle.getEntry(0)) + area);
-			areas.set(triangle.getEntry(1), areas.get(triangle.getEntry(1)) + area);
-			areas.set(triangle.getEntry(2), areas.get(triangle.getEntry(2)) + area);
-		}
+	// 	// Populate areas list
+	// 	for (int i = 0; i < mesh.getNumElements(); i++) {
+	// 		PiVector triangle = mesh.getElement(i);
+	// 		PdVector p1 = mesh.getVertex(triangle.getEntry(0));
+	// 		PdVector p2 = mesh.getVertex(triangle.getEntry(1));
+	// 		PdVector p3 = mesh.getVertex(triangle.getEntry(2));
+	// 		PdVector[] vertices = {p1, p2, p3}; 
+	// 		double area = calculateTriangleArea(vertices);
+	// 		areas.set(triangle.getEntry(0), areas.get(triangle.getEntry(0)) + area);
+	// 		areas.set(triangle.getEntry(1), areas.get(triangle.getEntry(1)) + area);
+	// 		areas.set(triangle.getEntry(2), areas.get(triangle.getEntry(2)) + area);
+	// 	}
 
-		// Populate Mass matrix
-		for (int i = 0; i < nVertices; i++) {
-			M.setEntry(i, i, areas.get(i) / 3);
-		}
+	// 	// Populate Mass matrix
+	// 	for (int i = 0; i < nVertices; i++) {
+	// 		M.setEntry(i, i, areas.get(i) / 3);
+	// 	}
 
-		m_MMatrixResult.setText("Calculated!");
-		return M;
-	}
+	// 	m_MMatrixResult.setText("Calculated!");
+	// 	return M;
+	// }
 
 	// task 1.3 Compute Mass Matrix M
-	private PdMatrix calculateMassMatrix2(PgElementSet mesh) {
+	private PnSparseMatrix calculateMVmatrix(PgElementSet mesh) {
 		m_MMatrixResult.setText("Calculating...");
 
 		int nTriangles = mesh.getNumElements();
-		PdMatrix M = new PdMatrix(3*nTriangles, 3*nTriangles);
+		PnSparseMatrix M = new PnSparseMatrix(3*nTriangles, 3*nTriangles);
 
 		// Populate areas list
 		for (int i = 0; i < mesh.getNumElements(); i++) {
@@ -644,9 +637,10 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 			PdVector p3 = mesh.getVertex(triangle.getEntry(2));
 			PdVector[] vertices = {p1, p2, p3};
 			double area = calculateTriangleArea(vertices);
-			M.setEntry(i, i, area);
-			M.setEntry(i+1, i+1, area);
-			M.setEntry(i+2, i+2, area);
+			int index = 3*i;
+			M.setEntry(index, index, area);
+			M.setEntry(index+1, index+1, area);
+			M.setEntry(index+2, index+2, area);
 		}
 
 		m_MMatrixResult.setText("Calculated!");
@@ -654,7 +648,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	}
 
 	// task 1.3 Compute Mass Matrix M (Test M using a generated triangle mesh)
-	private void testMassMatrix() {
+	private void testMVmatrix() {
 		// Create a triangle mesh
 		PgElementSet mesh = new PgElementSet(3);
 
@@ -665,7 +659,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		mesh.addElement(new PiVector(0, 1, 2)); // a triangle
 
 		// Manually calculate the M matrix
-		PdMatrix M_true = new PdMatrix(3, 3);
+		PnSparseMatrix M_true = new PnSparseMatrix(3, 3);
 		M_true.setEntry(0, 0, 0.5 / 3);
 		M_true.setEntry(0, 1, 0);
 		M_true.setEntry(0, 2, 0);
@@ -680,7 +674,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		// System.out.println("M_true matrix: " + M_true.toString());
 
 		// Calculate the gradient matrix using the function
-		PdMatrix M_calculated = calculateMassMatrix(mesh);
+		PnSparseMatrix M_calculated = calculateMVmatrix(mesh);
 		// System.out.println("M_calculated matrix: " + M_calculated.toString());
 
 		// Compare the two matrices
@@ -696,22 +690,22 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 	}
 
 	// task 1.4 Compute the cotangent matrix S
-	private PdMatrix calculateSMatrix(PgElementSet mesh) {
+	private PnSparseMatrix calculateSmatrix(PgElementSet mesh) {
 		m_SMatrixResult.setText("Calculating...");
-		PdMatrix M = calculateMassMatrix2(mesh);
-		PdMatrix G = calculateGMatrix(mesh);
-		PdMatrix G_copy = new PdMatrix(G.getNumRows(), G.getNumCols());
-		PdMatrix G_T = new PdMatrix(G.getNumCols(), G.getNumRows());
-		PdMatrix G_out = new PdMatrix(G.getNumRows(), G.getNumRows());
+		PnSparseMatrix M = calculateMVmatrix(mesh);
+		PnSparseMatrix G = calculateGmatrix(mesh);
+		PnSparseMatrix G_copy = new PnSparseMatrix(G.getNumRows(), G.getNumCols());
+		PnSparseMatrix G_T = new PnSparseMatrix(G.getNumCols(), G.getNumRows());
+		PnSparseMatrix G_out = new PnSparseMatrix(G.getNumRows(), G.getNumRows());
 		G_T.transpose(G);
-		System.out.println("G_T cols: " + G_T.getNumCols() + " G_T rows: " + G_T.getNumRows());
-		System.out.println("M cols: " + M.getNumCols() + " M rows: " + M.getNumRows());
-		System.out.println("G cols: " + G.getNumCols() + " G rows: " + G.getNumRows());
+		// System.out.println("G_T cols: " + G_T.getNumCols() + " G_T rows: " + G_T.getNumRows());
+		// System.out.println("M cols: " + M.getNumCols() + " M rows: " + M.getNumRows());
+		// System.out.println("G cols: " + G.getNumCols() + " G rows: " + G.getNumRows());
 
-		G_T.rightMult(M);
-		System.out.println("G_T cols: " + G_T.getNumCols() + " G_T rows: " + G.getNumRows());
-		G_out.mult(G_T, G);
-		System.out.println("G_out cols: " + G_out.getNumCols() + " G_out rows: " + G_out.getNumRows());
+		PnSparseMatrix temp = PnSparseMatrix.multMatrices(G_T, M, null);
+		// System.out.println("G_T cols: " + G_T.getNumCols() + " G_T rows: " + G.getNumRows());
+		PnSparseMatrix result = PnSparseMatrix.multMatrices(temp, G, null);
+		// System.out.println("G_out cols: " + G_out.getNumCols() + " G_out rows: " + G_out.getNumRows());
 		/*
 		System.out.println("G_copy cols: " + G_copy.getNumCols() + " G_copy rows: " + G_copy.getNumRows());
 		// calculate the transpose of G
@@ -730,11 +724,11 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		m_SMatrixResult.setText("Calculated!");
 		return G_copy;
 		*/
-		return G_out;
+		return result;
 	}
 
 	// task 1.4 Compute the cotangent matrix S (Test S using a generated triangle mesh)
-	private void testSMatrix() {
+	private void testSmatrix() {
 		// Create a triangle mesh
 		PgElementSet mesh = new PgElementSet(3);
 
@@ -745,7 +739,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		mesh.addElement(new PiVector(0, 1, 2)); // a triangle
 
 		// Manually calculate the S matrix
-		PdMatrix S_true = new PdMatrix(3, 3);
+		PnSparseMatrix S_true = new PnSparseMatrix(3, 3);
 		S_true.setEntry(0, 0, 1.0/3);
 		S_true.setEntry(0, 1, -0.5/3);
 		S_true.setEntry(0, 2, -0.5/3);
@@ -760,7 +754,7 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		// System.out.println("S_true matrix: " + S_true.toString());
 
 		// Calculate the gradient matrix using the function
-		PdMatrix S_calculated = calculateSMatrix(mesh);
+		PnSparseMatrix S_calculated = calculateSmatrix(mesh);
 		// System.out.println("S_calculated matrix: " + S_calculated.toString());
 
 		// Compare the two matrices
@@ -775,98 +769,249 @@ public class MyWorkshop_IP extends PjWorkshop_IP implements ActionListener {
 		m_SMatrixResult.setText("Success");
 	}
 	
-
-	private void computeSurface() {
+	// task 2
+	public void deformSelected(PdMatrix deformMatrix) {
+		// Check if the element is selected
 		PgElementSet mesh = m_ws.m_geom;
-		m_GMatrix = calculateGMatrix(mesh);
-		PnSparseMatrix G_alt = meshToGradient();
+		m_GMatrix = calculateGmatrix(mesh);
+		PnSparseMatrix G_alt = meshToGradient(mesh);
 		for (int i = 0; i < mesh.getNumElements(); i++) {
 			for (int j = 0; j < mesh.getNumVertices(); j++) {
 				if (G_alt.getEntry(i, j) != m_GMatrix.getEntry(i, j))
 					System.out.println("entry: " + G_alt.getEntry(i, j) + " does not match entry: " + m_GMatrix.getEntry(i, j));
 			}
 		}
-		System.out.println("entries match");
-		PdMatrix grads = getM_gradients();
-		PnSparseMatrix G = new PnSparseMatrix(m_GMatrix);
-		PnSparseMatrix G_T = G.transposeNew();
-		PnSparseMatrix M = new PnSparseMatrix(calculateMassMatrix2(mesh));
-		PnSparseMatrix G_TM = PnSparseMatrix.multMatrices(G_T, M, null);
-		PnSparseMatrix S = new PnSparseMatrix(calculateSMatrix(mesh));
-		System.out.println("M cols: " + M.getNumCols() + " M rows: " + M.getNumRows());
-		System.out.println("G_TM cols: " + G_TM.getNumCols() + " G_TM rows: " + G_TM.getNumRows());
-		System.out.println("S cols: " + S.getNumCols() + " S rows: " + S.getNumRows());
 
-		PdVector g_x = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(0), null);
-		PdVector g_y = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(1), null);
-		PdVector g_z = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(2), null);
+		System.out.println("Number of elements: " + mesh.getNumElements());
+		System.out.println("Number of vertices: " + mesh.getNumVertices());
 
-		PdVector v_x = new PdVector(mesh.getNumVertices());
-		PdVector v_y = new PdVector(mesh.getNumVertices());
-		PdVector v_z = new PdVector(mesh.getNumVertices());
+        PnSparseMatrix matrixG = calculateGmatrix(mesh);
+        PnSparseMatrix MatrixGTranspose = PnSparseMatrix.transposeNew(matrixG);
+        PnSparseMatrix matrixM = calculateMVmatrix(mesh);
 
-		System.out.println("g_x coords: " + g_x.getSize() + " g_y coords: " + g_y.getSize() + " g_z coords: " + g_z.getSize());
+        PnSparseMatrix s1 = PnSparseMatrix.multMatrices(MatrixGTranspose, PnSparseMatrix.multMatrices(matrixM, matrixG, null), null);
+        //s1.add(PnSparseMatrix.multScalar(matrixM, 0.0001));
+        PnSparseMatrix leftHand = PnSparseMatrix.copyNew(s1);
 
-		try {
-			long factorization = dev6.numeric.PnMumpsSolver.factor(S, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
-			dev6.numeric.PnMumpsSolver.solve(factorization, v_x, g_x);
-			dev6.numeric.PnMumpsSolver.solve(factorization, v_y, g_y);
-			dev6.numeric.PnMumpsSolver.solve(factorization, v_z, g_z);
+        PdVector x = new PdVector(mesh.getNumVertices());
+        PdVector y = new PdVector(mesh.getNumVertices());
+        PdVector z = new PdVector(mesh.getNumVertices());
 
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.out.println("solving did not succeed");
-		}
+        PdVector[] gTildes = calcGtilde(mesh, deformMatrix, matrixG);
 
-		System.out.println("v_x coords: " + v_x.getSize() + " v_y coords: " + v_y.getSize() + " v_z coords: " + v_z.getSize());
-		PdVector[] vertices = new PdVector[mesh.getNumVertices()];
-		PdMatrix verticesM = new PdMatrix(mesh.getNumVertices(), 3);
-		verticesM.setColumn(0, v_x);
-		verticesM.setColumn(1, v_y);
-		verticesM.setColumn(2, v_z);
-		for (int i = 0; i < mesh.getNumVertices(); i++) {
-			vertices[i] = verticesM.getRow(i);
-		}
-		mesh.setVertices(vertices);
-		mesh.update(mesh);
-	}
+        PnSparseMatrix rightMatrix = PnSparseMatrix.multMatrices(MatrixGTranspose, matrixM, null);
 
-	private PdMatrix getM_gradients() {
-		PgElementSet mesh = m_ws.m_geom;
-		PnSparseMatrix G = new PnSparseMatrix(m_GMatrix);
-		PdMatrix vertices = new PdMatrix(mesh.getNumVertices(), 3);
-		PdVector v_x = new PdVector(mesh.getNumVertices());
+        PdVector rightX = PnSparseMatrix.rightMultVector(rightMatrix, gTildes[0], null);
+        PdVector rightY = PnSparseMatrix.rightMultVector(rightMatrix, gTildes[1], null);
+        PdVector rightZ = PnSparseMatrix.rightMultVector(rightMatrix, gTildes[2], null);
+		
+        System.out.println("rightMatrix cols: " + rightMatrix.getNumCols() + " rightMatrix rows: " + rightMatrix.getNumRows());
+        System.out.println("MatrixGTranspose cols: " + MatrixGTranspose.getNumCols() + " MatrixGTranspose rows: " + MatrixGTranspose.getNumRows());
+        System.out.println("matrixM cols: " + matrixM.getNumCols() + " matrixM rows: " + matrixM.getNumRows());
+        System.out.println("s1 cols: " + s1.getNumCols() + " s1 rows: " + s1.getNumRows());
+        System.out.println("rightX size: " + rightX.getSize() + " rightY size: " + rightY.getSize() + " rightZ size: " + rightZ.getSize());
 
-		for (int i = 0; i < mesh.getNumVertices(); i++) {
-			v_x.setEntry(i, mesh.getVertex(i).getEntry(0));
-			vertices.setRow(i, mesh.getVertex(i));
-		}
+        try {
+    		
+    		long pointerToFactorization = PnMumpsSolver.factor(s1, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
+			PnMumpsSolver.solve(pointerToFactorization, x, rightX);
+			PnMumpsSolver.solve(pointerToFactorization, y, rightY);
+			PnMumpsSolver.solve(pointerToFactorization, z, rightZ);
 
-		PdMatrix grads = new PdMatrix(m_GMatrix.getNumRows(), 3);
-		PdVector xGradient = PnSparseMatrix.rightMultVector(G, v_x, null);
-		for (int i = 0; i < 3; i++) {
-			grads.setColumn(i, m_GMatrix.leftMultMatrix(null, vertices.getColumn(i)));
-		}
-		//System.out.println("m_GMatrix: " + m_GMatrix.toShortString());
-		//grads.mult(m_GMatrix, vertices);
-		System.out.println("grads cols: " + grads.getNumCols() + " grads rows: " + grads.getNumRows());
-		System.out.println("xGradient: " + xGradient.toShortString());
+            // PnMumpsSolver.solve(leftHand, x, rightX, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
+            // PnMumpsSolver.solve(leftHand, y, rightY, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
+            // PnMumpsSolver.solve(leftHand, z, rightZ, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
 
-		for (int i = 0; i < mesh.getNumElements(); i++) {
-			if (mesh.getElement(i).hasTag(PsObject.IS_SELECTED)) {
-				PdMatrix elementM = new PdMatrix(3, 3);
-				for (int j = 0; j < 3; j++) {
-					elementM.setColumn(j, grads.getRow(i*3+j));
-				}
-				elementM.rightMult(m_inputMatrix);
-				for (int j = 0; j < 3; j++) {
-					grads.setRow(i*3+j, elementM.getColumn(j));
-				}
-			}
-		}
+            // PnBiconjugateGradient solver = new PnBiconjugateGradient();
 
-		return grads;
-	}
+            // solver.solve(leftHand, x, rightX);
+            // solver.solve(leftHand, y, rightY);
+            // solver.solve(leftHand, z, rightZ);
+        } catch (Exception e) {
+            e.printStackTrace();
+			System.out.println("Error in solving the linear system");
+        }
+
+        PdVector[] vertices = mesh.getVertices();
+
+        // Calculate the old and new mean
+        PdVector sumOld = new PdVector(3);
+        PdVector sumNew = new PdVector(3);
+        for (int vIndex = 0; vIndex < mesh.getNumVertices(); vIndex++) {
+            PdVector vertexReal = vertices[vIndex];
+            sumOld.add(vertexReal);
+
+            sumNew.setEntry(0, sumNew.getEntry(0) + x.getEntry(vIndex));
+            sumNew.setEntry(1, sumNew.getEntry(1) + y.getEntry(vIndex));
+            sumNew.setEntry(2, sumNew.getEntry(2) + z.getEntry(vIndex));
+        }
+        sumOld.multScalar(1.0 / mesh.getNumVertices());
+        sumNew.multScalar(1.0 / mesh.getNumVertices());
+
+        // Get the translation from the new mean to the old mean
+        PdVector translationMean = PdVector.subNew(sumOld, sumNew);
+		System.out.println("Translation: " + translationMean);
+
+        for (int vIndex = 0; vIndex < mesh.getNumVertices(); vIndex++) {
+            PdVector newV = new PdVector(3);
+            newV.setEntry(0, x.getEntry(vIndex));
+            newV.setEntry(1, y.getEntry(vIndex));
+            newV.setEntry(2, z.getEntry(vIndex));
+
+
+            newV.add(translationMean);
+
+			// randomize the deformation
+			// newV.setEntry(0, newV.getEntry(0) + (Math.random() * 0.01));
+
+            m_ws.m_geom.setVertex(vIndex, newV);
+        }
+
+        m_ws.m_geom.update(mesh);
+    }
+
+	private void addDeformationMatrix(PdMatrix deform, PdVector vector, int index) {
+        PdVector temp = new PdVector(3);
+        temp.setEntry(0, vector.getEntry((index*3) + 0));
+        temp.setEntry(1, vector.getEntry((index*3) + 1));
+        temp.setEntry(2, vector.getEntry((index*3) + 2));
+
+        temp.leftMultMatrix(deform);
+
+        vector.setEntry((index*3) + 0, temp.getEntry(0));
+        vector.setEntry((index*3) + 1, temp.getEntry(1));
+        vector.setEntry((index*3) + 2, temp.getEntry(2));
+    }
+
+	public PdVector[] calcGtilde(PgElementSet mesh, PdMatrix userMatrix, PnSparseMatrix matrixG) {
+
+        // Get the current x/y/z values
+        PdVector x = new PdVector(mesh.getNumVertices());
+        PdVector y = new PdVector(mesh.getNumVertices());
+        PdVector z = new PdVector(mesh.getNumVertices());
+        for(int i = 0; i < mesh.getNumVertices(); i++) {
+            x.setEntry(i, mesh.getVertex(i).getEntry(0));
+            y.setEntry(i, mesh.getVertex(i).getEntry(1));
+            z.setEntry(i, mesh.getVertex(i).getEntry(2));
+        }
+
+        // Calculate G*x/y/z
+        PdVector xGradient = PnSparseMatrix.rightMultVector(matrixG, x, null);
+        PdVector yGradient = PnSparseMatrix.rightMultVector(matrixG, y, null);
+        PdVector zGradient = PnSparseMatrix.rightMultVector(matrixG, z, null);
+        //System.out.println("matrixG: " + matrixG.toShortString());
+        // System.out.println("xGradient: " + xGradient.toShortString());
+
+        // multiple with user selected matrix for each selected triangle
+        PiVector[] triangles = m_ws.m_geom.getElements();
+        for(int triangleIdx = 0; triangleIdx < triangles.length; triangleIdx++) {
+            if (triangles[triangleIdx].hasTag(PsObject.IS_SELECTED)) {
+                addDeformationMatrix(userMatrix, xGradient, triangleIdx);
+                addDeformationMatrix(userMatrix, yGradient, triangleIdx);
+                addDeformationMatrix(userMatrix, zGradient, triangleIdx);
+            }
+        }
+
+        // Combine results
+        PdVector[] res = new PdVector[3];
+        res[0] = xGradient;
+        res[1] = yGradient;
+        res[2] = zGradient;
+
+        return res;
+    }
+
+	// private void computeSurface() {
+	// 	PgElementSet mesh = m_ws.m_geom;
+	// 	m_GMatrix = calculateGmatrix(mesh);
+	// 	// PnSparseMatrix G_alt = meshToGradient(mesh);
+	// 	// for (int i = 0; i < mesh.getNumElements(); i++) {
+	// 	// 	for (int j = 0; j < mesh.getNumVertices(); j++) {
+	// 	// 		if (G_alt.getEntry(i, j) != m_GMatrix.getEntry(i, j))
+	// 	// 			System.out.println("entry: " + G_alt.getEntry(i, j) + " does not match entry: " + m_GMatrix.getEntry(i, j));
+	// 	// 	}
+	// 	// }
+	// 	System.out.println("entries match");
+	// 	PdMatrix grads = getGradients();
+	// 	PnSparseMatrix G = m_GMatrix;
+	// 	PnSparseMatrix G_T = G.transposeNew();
+	// 	PnSparseMatrix M = calculateMVmatrix(mesh);
+	// 	PnSparseMatrix G_TM = PnSparseMatrix.multMatrices(G_T, M, null);
+	// 	PnSparseMatrix S = calculateSmatrix(mesh);
+	// 	// System.out.println("M cols: " + M.getNumCols() + " M rows: " + M.getNumRows());
+	// 	// System.out.println("G_TM cols: " + G_TM.getNumCols() + " G_TM rows: " + G_TM.getNumRows());
+	// 	// System.out.println("S cols: " + S.getNumCols() + " S rows: " + S.getNumRows());
+
+	// 	PdVector g_x = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(0), null);
+	// 	PdVector g_y = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(1), null);
+	// 	PdVector g_z = PnSparseMatrix.rightMultVector(G_TM, grads.getColumn(2), null);
+
+	// 	PdVector v_x = new PdVector(mesh.getNumVertices());
+	// 	PdVector v_y = new PdVector(mesh.getNumVertices());
+	// 	PdVector v_z = new PdVector(mesh.getNumVertices());
+
+	// 	// System.out.println("g_x coords: " + g_x.getSize() + " g_y coords: " + g_y.getSize() + " g_z coords: " + g_z.getSize());
+
+	// 	try {
+	// 		long factorization = dev6.numeric.PnMumpsSolver.factor(S, PnMumpsSolver.Type.GENERAL_SYMMETRIC);
+	// 		dev6.numeric.PnMumpsSolver.solve(factorization, v_x, g_x);
+	// 		dev6.numeric.PnMumpsSolver.solve(factorization, v_y, g_y);
+	// 		dev6.numeric.PnMumpsSolver.solve(factorization, v_z, g_z);
+
+	// 	} catch (Exception e) {
+	// 		e.printStackTrace();
+	// 		System.out.println("solving did not succeed");
+	// 	}
+
+	// 	// System.out.println("v_x coords: " + v_x.getSize() + " v_y coords: " + v_y.getSize() + " v_z coords: " + v_z.getSize());
+	// 	PdVector[] vertices = new PdVector[mesh.getNumVertices()];
+	// 	PdMatrix verticesM = new PdMatrix(mesh.getNumVertices(), 3);
+	// 	verticesM.setColumn(0, v_x);
+	// 	verticesM.setColumn(1, v_y);
+	// 	verticesM.setColumn(2, v_z);
+	// 	for (int i = 0; i < mesh.getNumVertices(); i++) {
+	// 		vertices[i] = verticesM.getRow(i);
+	// 	}
+	// 	mesh.setVertices(vertices);
+	// 	mesh.update(mesh);
+	// }
+
+	// private PdMatrix getGradients() {
+	// 	PgElementSet mesh = m_ws.m_geom;
+	// 	PnSparseMatrix G = m_GMatrix;
+	// 	PdMatrix vertices = new PdMatrix(mesh.getNumVertices(), 3);
+	// 	PdVector v_x = new PdVector(mesh.getNumVertices());
+
+	// 	for (int i = 0; i < mesh.getNumVertices(); i++) {
+	// 		v_x.setEntry(i, mesh.getVertex(i).getEntry(0));
+	// 		vertices.setRow(i, mesh.getVertex(i));
+	// 	}
+
+	// 	PdMatrix grads = new PdMatrix(m_GMatrix.getNumRows(), 3);
+	// 	PdVector xGradient = PnSparseMatrix.rightMultVector(G, v_x, null);
+	// 	for (int i = 0; i < 3; i++) {
+	// 		grads.setColumn(i, m_GMatrix.leftMultMatrix(null, vertices.getColumn(i)));
+	// 	}
+	// 	//System.out.println("m_GMatrix: " + m_GMatrix.toShortString());
+	// 	// //grads.mult(m_GMatrix, vertices);
+	// 	// System.out.println("grads cols: " + grads.getNumCols() + " grads rows: " + grads.getNumRows());
+	// 	// System.out.println("xGradient: " + xGradient.toShortString());
+
+	// 	for (int i = 0; i < mesh.getNumElements(); i++) {
+	// 		if (mesh.getElement(i).hasTag(PsObject.IS_SELECTED)) {
+	// 			PdMatrix elementM = new PdMatrix(3, 3);
+	// 			for (int j = 0; j < 3; j++) {
+	// 				elementM.setColumn(j, grads.getRow(i*3+j));
+	// 			}
+	// 			elementM.rightMult(m_inputMatrix);
+	// 			for (int j = 0; j < 3; j++) {
+	// 				grads.setRow(i*3+j, elementM.getColumn(j));
+	// 			}
+	// 		}
+	// 	}
+
+	// 	return grads;
+	// }
 	
 	/**
 	 * Get information which bottom buttons a dialog should create

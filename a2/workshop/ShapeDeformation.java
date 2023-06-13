@@ -71,7 +71,7 @@ public class ShapeDeformation extends PjWorkshop {
     }
 
 
-    public void deformSelected(PdMatrix deformMatrix) {
+    public void deformSelected(PdMatrix userMatrix) {
         PnSparseMatrix matrixG = meshToGradient();
         PnSparseMatrix MatrixGTranspose = PnSparseMatrix.transposeNew(matrixG);
         PnSparseMatrix matrixM = getMv();
@@ -86,7 +86,7 @@ public class ShapeDeformation extends PjWorkshop {
         PdVector z = new PdVector(m_geom.getNumVertices());
 
         PsDebug.warning("Calculating g tildes");
-        PdVector[] gTildes = calcGtilde(deformMatrix, matrixG);
+        PdVector[] gTildes = calcGtilde(userMatrix, matrixG);
 
         PsDebug.warning("Calculating Matrix part of right hand");
         PnSparseMatrix rightMatrix = PnSparseMatrix.multMatrices(MatrixGTranspose, matrixM, null);
@@ -228,11 +228,11 @@ public class ShapeDeformation extends PjWorkshop {
 
     /**
      * Calculates the g tilde vectors for x, y and z.
-     * @param deformMatrix The deformation matrix
+     * @param userMatrix The deformation matrix
      * @param matrixG The gradient matrix
      * @return A vector of size 3 containing in this order: G*x, G*y, G*z
      */
-    public PdVector[] calcGtilde(PdMatrix deformMatrix, PnSparseMatrix matrixG) {
+    public PdVector[] calcGtilde(PdMatrix userMatrix, PnSparseMatrix matrixG) {
 
         // Get the current x/y/z values
         PdVector x = new PdVector(m_geom.getNumVertices());
@@ -255,9 +255,9 @@ public class ShapeDeformation extends PjWorkshop {
         PiVector[] triangles = m_geom.getElements();
         for(int triangleIdx = 0; triangleIdx < triangles.length; triangleIdx++) {
             if (triangles[triangleIdx].hasTag(PsObject.IS_SELECTED)) {
-                addDeformationMatrix(deformMatrix, xGradient, triangleIdx);
-                addDeformationMatrix(deformMatrix, yGradient, triangleIdx);
-                addDeformationMatrix(deformMatrix, zGradient, triangleIdx);
+                addDeformationMatrix(userMatrix, xGradient, triangleIdx);
+                addDeformationMatrix(userMatrix, yGradient, triangleIdx);
+                addDeformationMatrix(userMatrix, zGradient, triangleIdx);
             }
         }
 
